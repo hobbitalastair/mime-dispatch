@@ -5,58 +5,47 @@ import (
 	"os"
 
 	"metadata/lib"
+
+	"github.com/spf13/pflag"
 )
 
 func main() {
-	if len(os.Args) < 3 {
+	xattrOnly := pflag.BoolP("xattr-only", "x", false, "Only access extended attributes")
+	fileOnly := pflag.BoolP("file-only", "f", false, "Only access file contents")
+
+	pflag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: metadata <command> <file> [args...]")
 		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		fmt.Fprintln(os.Stderr, "")
+		pflag.PrintDefaults()
+	}
+	pflag.Parse()
+
+	args := pflag.Args()
+
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "Usage: metadata <command> <file> [args...]")
+		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		pflag.PrintDefaults()
 		os.Exit(1)
 	}
 
 	opts := lib.Options{
-		XattrOnly: contains(os.Args, "--xattr-only"),
-		FileOnly:  contains(os.Args, "--file-only"),
+		XattrOnly: *xattrOnly,
+		FileOnly:  *fileOnly,
 	}
 
-	args := os.Args[1:]
-
-	var command string
-	var filePath string
-	var remainingArgs []string
-
-	for i, arg := range args {
-		if len(arg) > 0 && arg[0] == '-' {
-			continue
-		}
-		command = arg
-		if i+1 < len(args) {
-			allRemaining := args[i+1:]
-			filePath = findFileArg(allRemaining)
-			nonFlagArgs := filterFlags(allRemaining)
-			if filePath != "" {
-				remainingArgs = removeFileArg(nonFlagArgs, filePath)
-			}
-		}
-		break
-	}
-
-	if command == "" {
-		fmt.Fprintln(os.Stderr, "Usage: metadata <command> <file> [args...]")
-		os.Exit(1)
-	}
+	command := args[0]
+	filePath := args[1]
+	remainingArgs := args[2:]
 
 	var err error
 
 	switch command {
 	case "list":
-		if filePath == "" {
-			fmt.Fprintln(os.Stderr, "Usage: metadata list <file>")
-			os.Exit(1)
-		}
 		err = handleList(filePath, opts)
 	case "set":
-		if filePath == "" || len(remainingArgs) < 2 {
+		if len(remainingArgs) < 2 {
 			fmt.Fprintln(os.Stderr, "Usage: metadata set <file> <key> <value>")
 			os.Exit(1)
 		}
@@ -64,7 +53,7 @@ func main() {
 		value := remainingArgs[1]
 		err = handleSet(filePath, key, value, opts)
 	case "delete":
-		if filePath == "" || len(remainingArgs) < 1 {
+		if len(remainingArgs) < 1 {
 			fmt.Fprintln(os.Stderr, "Usage: metadata delete <file> <key>")
 			os.Exit(1)
 		}
@@ -79,44 +68,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
-func findFileArg(args []string) string {
-	for _, arg := range args {
-		if len(arg) > 0 && arg[0] != '-' {
-			return arg
-		}
-	}
-	return ""
-}
-
-func filterFlags(args []string) []string {
-	var result []string
-	for _, arg := range args {
-		if len(arg) > 0 && arg[0] != '-' {
-			result = append(result, arg)
-		}
-	}
-	return result
-}
-
-func removeFileArg(args []string, filePath string) []string {
-	var result []string
-	for _, arg := range args {
-		if arg != filePath {
-			result = append(result, arg)
-		}
-	}
-	return result
 }
 
 func handleList(filePath string, opts lib.Options) error {

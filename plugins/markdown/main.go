@@ -5,57 +5,59 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
 
 func main() {
-	if len(os.Args) < 3 {
+	pflag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: metadata-markdown <command> <file> [args...]")
 		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		fmt.Fprintln(os.Stderr, "")
+		pflag.PrintDefaults()
+	}
+	pflag.Parse()
+
+	args := pflag.Args()
+
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "Usage: metadata-markdown <command> <file> [args...]")
+		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		pflag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	command := os.Args[1]
-	filePath := os.Args[2]
+	command := args[0]
+	filePath := args[1]
+	remainingArgs := args[2:]
 
-	var key, value string
+	var err error
 
 	switch command {
 	case "list":
-		if filePath == "" {
-			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown list <file>")
-			os.Exit(1)
-		}
-		err := extractMetadata(filePath)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		err = extractMetadata(filePath)
 	case "set":
-		if len(os.Args) < 5 {
+		if len(remainingArgs) < 2 {
 			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown set <file> <key> <value>")
 			os.Exit(1)
 		}
-		key = os.Args[3]
-		value = os.Args[4]
-		err := setMetadata(filePath, key, value)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		key := remainingArgs[0]
+		value := remainingArgs[1]
+		err = setMetadata(filePath, key, value)
 	case "delete":
-		if len(os.Args) < 4 {
+		if len(remainingArgs) < 1 {
 			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown delete <file> <key>")
 			os.Exit(1)
 		}
-		key = os.Args[3]
-		err := deleteMetadata(filePath, key)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		key := remainingArgs[0]
+		err = deleteMetadata(filePath, key)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
+		os.Exit(1)
+	}
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
