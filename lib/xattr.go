@@ -3,14 +3,35 @@ package lib
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/pkg/xattr"
 	"golang.org/x/sys/unix"
 )
 
-const MimetypeXattr = "user.mime_type"
+const (
+	MimetypeXattr     = "user.mime_type"
+	MetadataNamespace = "user.metadata."
+)
 
 var ErrXattrNotSupported = errors.New("extended attributes not supported on this system")
+
+func xattrKeyToDisplayName(key string) (string, bool) {
+	if key == MimetypeXattr {
+		return "mime_type", true
+	}
+	if strings.HasPrefix(key, MetadataNamespace) {
+		return key[len(MetadataNamespace):], true
+	}
+	return "", false
+}
+
+func displayNameToXattrKey(name string) string {
+	if name == "mime_type" {
+		return MimetypeXattr
+	}
+	return MetadataNamespace + name
+}
 
 func GetXattr(path string) (map[string][]string, error) {
 	if !xattr.XATTR_SUPPORTED {
@@ -28,21 +49,26 @@ func GetXattr(path string) (map[string][]string, error) {
 	}
 
 	for _, name := range names {
+		displayName, ok := xattrKeyToDisplayName(name)
+		if !ok {
+			continue
+		}
 		value, err := xattr.Get(path, name)
 		if err != nil {
 			continue
 		}
-		attrs[name] = []string{string(value)}
+		attrs[displayName] = []string{string(value)}
 	}
 
 	return attrs, nil
 }
 
-func GetXattrValue(path, key string) (string, error) {
+func GetXattrValue(path, displayName string) (string, error) {
 	if !xattr.XATTR_SUPPORTED {
 		return "", ErrXattrNotSupported
 	}
 
+	key := displayNameToXattrKey(displayName)
 	value, err := xattr.Get(path, key)
 	if err != nil {
 		if errors.Is(err, unix.EOPNOTSUPP) {
@@ -56,11 +82,12 @@ func GetXattrValue(path, key string) (string, error) {
 	return string(value), nil
 }
 
-func SetXattr(path, key, value string) error {
+func SetXattr(path, displayName, value string) error {
 	if !xattr.XATTR_SUPPORTED {
 		return ErrXattrNotSupported
 	}
 
+	key := displayNameToXattrKey(displayName)
 	err := xattr.Set(path, key, []byte(value))
 	if err != nil {
 		if errors.Is(err, unix.EOPNOTSUPP) {
@@ -71,11 +98,12 @@ func SetXattr(path, key, value string) error {
 	return nil
 }
 
-func DeleteXattr(path, key string) error {
+func DeleteXattr(path, displayName string) error {
 	if !xattr.XATTR_SUPPORTED {
 		return ErrXattrNotSupported
 	}
 
+	key := displayNameToXattrKey(displayName)
 	err := xattr.Remove(path, key)
 	if err != nil {
 		if errors.Is(err, unix.EOPNOTSUPP) {

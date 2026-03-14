@@ -163,3 +163,135 @@ author: Test Author
 		t.Errorf("expected author in output, got: %s", output)
 	}
 }
+
+func TestXattrOnlyList(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+author: File Author
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "xattr-key", "xattr-value")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--xattr-only", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "xattr-key: xattr-value") {
+		t.Errorf("expected xattr in output, got: %s", output)
+	}
+	if strings.Contains(output, "title:") {
+		t.Errorf("expected no file metadata in output when using --xattr-only, got: %s", output)
+	}
+}
+
+func TestXattrOnlySet(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+author: File Author
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "xattr-key", "xattr-value")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: File Title") {
+		t.Errorf("expected file metadata in output, got: %s", output)
+	}
+	if !strings.Contains(output, "xattr-key: xattr-value") {
+		t.Errorf("expected xattr in output, got: %s", output)
+	}
+
+	fileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if strings.Contains(string(fileContent), "xattr-key") {
+		t.Errorf("expected xattr not to be in file content when using --xattr-only, got: %s", fileContent)
+	}
+}
+
+func TestXattrOnlyDelete(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+author: File Author
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "xattr-key", "xattr-value")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "delete", "--xattr-only", testFile, "xattr-key")
+	if err != nil {
+		t.Fatalf("delete xattr failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: File Title") {
+		t.Errorf("expected file metadata in output, got: %s", output)
+	}
+	if strings.Contains(output, "xattr-key:") {
+		t.Errorf("expected xattr to be deleted, got: %s", output)
+	}
+
+	fileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(fileContent), "title:") {
+		t.Errorf("expected file metadata to still exist after --xattr-only delete, got: %s", fileContent)
+	}
+}

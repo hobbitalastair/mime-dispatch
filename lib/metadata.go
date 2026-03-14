@@ -35,7 +35,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 		}
 		if err == nil {
 			for k, v := range xattrs {
-				if k == MimetypeXattr {
+				if k == "mime_type" {
 					continue
 				}
 				xattrMeta[k] = v
@@ -132,7 +132,7 @@ func getMimeType(filePath string, opts Options) (string, error) {
 		return mimeType, nil
 	}
 
-	mimeType, err := GetXattrValue(filePath, MimetypeXattr)
+	mimeType, err := GetXattrValue(filePath, "mime_type")
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +146,7 @@ func getMimeType(filePath string, opts Options) (string, error) {
 		return "", err
 	}
 
-	if err := SetXattr(filePath, MimetypeXattr, mimeType); err != nil {
+	if err := SetXattr(filePath, "mime_type", mimeType); err != nil {
 		return "", err
 	}
 
