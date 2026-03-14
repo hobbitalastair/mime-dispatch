@@ -3,7 +3,9 @@ package lib
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 )
 
 type Options struct {
@@ -29,18 +31,26 @@ func (m Metadata) ToYAML() string {
 }
 
 func MergeMetadata(fileMeta, xattrMeta map[string][]string) map[string][]string {
-	result := make(map[string][]string)
-
-	for k, v := range fileMeta {
-		result[k] = v
+	seen := make(map[string]map[string]struct{})
+	addMetadata := func(key string, values []string) {
+		if _, exists := seen[key]; !exists {
+			seen[key] = make(map[string]struct{})
+		}
+		for _, value := range values {
+			seen[key][value] = struct{}{}
+		}
 	}
 
-	for k, v := range xattrMeta {
-		if existing, exists := result[k]; exists {
-			result[k] = append(existing, v...)
-		} else {
-			result[k] = v
-		}
+	for key, values := range fileMeta {
+		addMetadata(key, values)
+	}
+	for key, values := range xattrMeta {
+		addMetadata(key, values)
+	}
+
+	result := make(map[string][]string)
+	for key, values := range seen {
+		result[key] = slices.Sorted(maps.Keys(values))
 	}
 
 	return result

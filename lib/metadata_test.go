@@ -40,6 +40,12 @@ func TestMergeMetadata(t *testing.T) {
 			expected: map[string][]string{"key": {"value1", "value2", "value3"}},
 		},
 		{
+			name:     "multi-valued keys with duplicates",
+			fileMeta: map[string][]string{"key": {"value1", "value3"}},
+			xattrMap: map[string][]string{"key": {"value3"}},
+			expected: map[string][]string{"key": {"value1", "value3"}},
+		},
+		{
 			name:     "mime_type from xattr included",
 			fileMeta: map[string][]string{"title": {"File Title"}},
 			xattrMap: map[string][]string{"mime_type": {"text/markdown"}, "author": {"Test Author"}},
