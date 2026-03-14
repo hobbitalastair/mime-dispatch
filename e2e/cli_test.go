@@ -51,7 +51,7 @@ func buildAll() error {
 		dir  string
 	}{
 		{"cli", "../cmd/metadata"},
-		{"markdown", "../plugins/markdown"},
+		{"yaml-frontmatter", "../plugins/yaml-frontmatter"},
 		{"audio", "../plugins/audio"},
 		{"image", "../plugins/image"},
 	}
@@ -86,7 +86,8 @@ func installPlugins() error {
 		binary   string
 		commands []string
 	}{
-		"text/markdown":      {"markdown", []string{"metadata-list", "metadata-add", "metadata-delete"}},
+		"text/markdown":      {"yaml-frontmatter", []string{"metadata-list", "metadata-add", "metadata-delete"}},
+		"text/plain":         {"yaml-frontmatter", []string{"metadata-list", "metadata-add", "metadata-delete"}},
 		"audio/mpeg":         {"audio", []string{"metadata-list"}},
 		"audio/ogg":          {"audio", []string{"metadata-list"}},
 		"audio/x-vorbis+ogg": {"audio", []string{"metadata-list"}},

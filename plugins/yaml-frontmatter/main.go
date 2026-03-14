@@ -5,10 +5,28 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
+
+// formatValue converts any YAML-decoded value to its string representation.
+// This handles types that gopkg.in/yaml.v3 automatically parses from scalars,
+// such as time.Time (from dates like 2026-03-05), bool, int, float64, etc.
+func formatValue(v interface{}) string {
+	switch val := v.(type) {
+	case string:
+		return val
+	case time.Time:
+		if val.Hour() == 0 && val.Minute() == 0 && val.Second() == 0 && val.Nanosecond() == 0 {
+			return val.Format("2006-01-02")
+		}
+		return val.Format(time.RFC3339)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
 
 func main() {
 	command := filepath.Base(os.Args[0])
@@ -80,13 +98,13 @@ func extractMetadata(filePath string) error {
 
 	for k, v := range metadata {
 		switch val := v.(type) {
-		case string:
-			fmt.Printf("%s: %s\n", k, val)
 		case []interface{}:
 			fmt.Printf("%s:\n", k)
 			for _, item := range val {
-				fmt.Printf("  - %s\n", item)
+				fmt.Printf("  - %s\n", formatValue(item))
 			}
+		default:
+			fmt.Printf("%s: %s\n", k, formatValue(val))
 		}
 	}
 
@@ -113,12 +131,12 @@ func addMetadata(filePath, key, value string) error {
 	// If key already exists, convert to list and append
 	if existing, ok := metadata[key]; ok {
 		switch v := existing.(type) {
-		case string:
-			// Convert single value to list and append
-			metadata[key] = []interface{}{v, value}
 		case []interface{}:
 			// Append to existing list
 			metadata[key] = append(v, value)
+		default:
+			// Convert single value to list and append
+			metadata[key] = []interface{}{v, value}
 		}
 	} else {
 		// New key
@@ -151,17 +169,12 @@ func deleteMetadata(filePath, key, value string) error {
 
 	if existing, ok := metadata[key]; ok {
 		switch v := existing.(type) {
-		case string:
-			// Single value - if it matches, delete the key
-			if v == value {
-				delete(metadata, key)
-			}
 		case []interface{}:
 			// List - remove matching value
 			var newList []interface{}
 			found := false
 			for _, item := range v {
-				if fmt.Sprintf("%v", item) != value {
+				if formatValue(item) != value {
 					newList = append(newList, item)
 				} else {
 					found = true
@@ -174,6 +187,11 @@ func deleteMetadata(filePath, key, value string) error {
 					// Keep as list even if only one element remains
 					metadata[key] = newList
 				}
+			}
+		default:
+			// Single value - if it matches, delete the key
+			if formatValue(v) == value {
+				delete(metadata, key)
 			}
 		}
 	}

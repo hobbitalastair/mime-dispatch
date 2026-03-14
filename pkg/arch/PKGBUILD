@@ -1,0 +1,71 @@
+pkgname=metadata
+pkgver=1
+pkgrel=1
+pkgdesc="CLI tool for manipulating file metadata"
+arch=('x86_64')
+license=('MIT')
+depends=('perl-file-mimeinfo')
+makedepends=('go')
+source=()
+sha256sums=()
+
+build() {
+  cd "$startdir/../.."
+
+  go build -v \
+    -trimpath \
+    -ldflags "-linkmode=external" \
+    -o "$srcdir/metadata" ./cmd/metadata
+
+  go build -v \
+    -trimpath \
+    -ldflags "-linkmode=external" \
+    -o "$srcdir/metadata-yaml-frontmatter" ./plugins/yaml-frontmatter
+
+  cd "$startdir/../../plugins/audio"
+  go build -v \
+    -trimpath \
+    -ldflags "-linkmode=external" \
+    -o "$srcdir/metadata-audio" .
+
+  cd "$startdir/../../plugins/image"
+  go build -v \
+    -trimpath \
+    -ldflags "-linkmode=external" \
+    -o "$srcdir/metadata-image" .
+}
+
+package() {
+  # Main binary
+  install -Dm755 "$srcdir/metadata" "$pkgdir/usr/bin/metadata"
+
+  # Plugin binaries
+  install -Dm755 "$srcdir/metadata-yaml-frontmatter" "$pkgdir/usr/lib/metadata/metadata-yaml-frontmatter"
+  install -Dm755 "$srcdir/metadata-audio"    "$pkgdir/usr/lib/metadata/metadata-audio"
+  install -Dm755 "$srcdir/metadata-image"    "$pkgdir/usr/lib/metadata/metadata-image"
+
+  # YAML frontmatter plugin: text/markdown, text/plain (list, add, delete)
+  install -dm755 "$pkgdir/usr/lib/mimetype/text/markdown"
+  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/markdown/metadata-list"
+  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/markdown/metadata-add"
+  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/markdown/metadata-delete"
+
+  install -dm755 "$pkgdir/usr/lib/mimetype/text/plain"
+  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/plain/metadata-list"
+  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/plain/metadata-add"
+  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/plain/metadata-delete"
+
+  # Audio plugin: audio/mpeg, audio/ogg, audio/x-vorbis+ogg (list only)
+  install -dm755 "$pkgdir/usr/lib/mimetype/audio/mpeg"
+  ln -s ../../../metadata/metadata-audio "$pkgdir/usr/lib/mimetype/audio/mpeg/metadata-list"
+
+  install -dm755 "$pkgdir/usr/lib/mimetype/audio/ogg"
+  ln -s ../../../metadata/metadata-audio "$pkgdir/usr/lib/mimetype/audio/ogg/metadata-list"
+
+  install -dm755 "$pkgdir/usr/lib/mimetype/audio/x-vorbis+ogg"
+  ln -s ../../../metadata/metadata-audio "$pkgdir/usr/lib/mimetype/audio/x-vorbis+ogg/metadata-list"
+
+  # Image plugin: image/jpeg (list only)
+  install -dm755 "$pkgdir/usr/lib/mimetype/image/jpeg"
+  ln -s ../../../metadata/metadata-image "$pkgdir/usr/lib/mimetype/image/jpeg/metadata-list"
+}
