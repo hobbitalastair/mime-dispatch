@@ -39,6 +39,12 @@ func main() {
 	filePath := args[1]
 	remainingArgs := args[2:]
 
+	// Apply Landlock sandbox restrictions
+	if err := lib.SetupSandbox(filePath); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to setup sandbox:", err)
+		os.Exit(1)
+	}
+
 	var err error
 
 	switch command {
