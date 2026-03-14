@@ -9,6 +9,27 @@ import (
 	"strings"
 )
 
+type PluginCommand int
+
+const (
+	PluginList PluginCommand = iota
+	PluginAdd
+	PluginDelete
+)
+
+func (c PluginCommand) String() string {
+	switch c {
+	case PluginList:
+		return "list"
+	case PluginAdd:
+		return "add"
+	case PluginDelete:
+		return "delete"
+	default:
+		return "unknown"
+	}
+}
+
 func PluginSearchPaths() []string {
 	userConfigDir := os.Getenv("XDG_CONFIG_HOME")
 	if userConfigDir == "" {
@@ -25,88 +46,23 @@ func PluginSearchPaths() []string {
 	}
 }
 
-func FindPlugin(mimeType string) (string, error) {
-	for _, baseDir := range PluginSearchPaths() {
-		pluginDir := filepath.Join(baseDir, mimeType)
-		info, err := os.Lstat(pluginDir)
-		if err != nil {
-			continue
-		}
-
-		if info.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(pluginDir)
-			if err != nil {
-				continue
-			}
-			if filepath.IsAbs(target) {
-				return target, nil
-			}
-			absTarget, err := filepath.Abs(filepath.Join(pluginDir, target))
-			if err != nil {
-				continue
-			}
-			return absTarget, nil
-		}
-
-		if info.IsDir() {
-			entries, err := os.ReadDir(pluginDir)
-			if err != nil || len(entries) == 0 {
-				continue
-			}
-			for _, entry := range entries {
-				if entry.Type()&os.ModeSymlink != 0 {
-					entryPath := filepath.Join(pluginDir, entry.Name())
-					target, err := os.Readlink(entryPath)
-					if err != nil {
-						continue
-					}
-					var absTarget string
-					if filepath.IsAbs(target) {
-						absTarget = target
-					} else {
-						absTarget, err = filepath.Abs(filepath.Join(pluginDir, target))
-						if err != nil {
-							continue
-						}
-					}
-					return absTarget, nil
-				}
-			}
-		}
-	}
-
-	return "", ErrNoPluginFound{MimeType: mimeType}
-}
-
 type ErrNoPluginFound struct {
 	MimeType string
-	Command  string
+	Command  PluginCommand
 }
 
 func (e ErrNoPluginFound) Error() string {
-	if e.Command != "" {
-		return "no plugin found for mime type: " + e.MimeType + " (command: " + e.Command + ")"
-	}
-	return "no plugin found for mime type: " + e.MimeType
+	return "no plugin found for mime type: " + e.MimeType + " (command: " + e.Command.String() + ")"
 }
 
-func FindPluginForCommand(mimeType, command string) (string, error) {
-	pluginPath := filepath.Join(mimeType, command)
+func FindPluginForCommand(mimeType string, command PluginCommand) (string, error) {
+	pluginPath := filepath.Join(mimeType, command.String())
 	for _, baseDir := range PluginSearchPaths() {
 		fullPath := filepath.Join(baseDir, pluginPath)
 		info, err := os.Lstat(fullPath)
 		if err == nil {
-			if info.Mode()&os.ModeSymlink != 0 {
-				target, err := os.Readlink(fullPath)
-				if err == nil {
-					var absTarget string
-					if filepath.IsAbs(target) {
-						absTarget = target
-					} else {
-						absTarget, _ = filepath.Abs(filepath.Join(fullPath, target))
-					}
-					return absTarget, nil
-				}
+			if info.Mode()&os.ModeSymlink != 0 || info.Mode().IsRegular() {
+				return fullPath, nil
 			}
 		}
 	}
@@ -114,57 +70,28 @@ func FindPluginForCommand(mimeType, command string) (string, error) {
 	genericPath := mimeType
 	for _, baseDir := range PluginSearchPaths() {
 		fullPath := filepath.Join(baseDir, genericPath)
-
-		// First, look for a "metadata" symlink directly
-		metadataSymlink := filepath.Join(fullPath, "metadata")
-		info, err := os.Lstat(metadataSymlink)
-		if err == nil && info.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(metadataSymlink)
-			if err == nil {
-				var absTarget string
-				if filepath.IsAbs(target) {
-					absTarget = target
-				} else {
-					absTarget, _ = filepath.Abs(filepath.Join(metadataSymlink, target))
-				}
-				return absTarget, nil
-			}
-		}
-
-		// Then, check if the genericPath itself is a symlink
-		info, err = os.Lstat(fullPath)
+		info, err := os.Lstat(fullPath)
 		if err != nil {
 			continue
 		}
 
 		if info.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(fullPath)
-			if err != nil {
-				continue
-			}
-			if filepath.IsAbs(target) {
-				return target, nil
-			}
-			absTarget, err := filepath.Abs(filepath.Join(fullPath, target))
-			if err != nil {
-				continue
-			}
-			return absTarget, nil
+			return fullPath, nil
 		}
 	}
 
 	return "", ErrNoPluginFound{MimeType: mimeType, Command: command}
 }
 
-func RunPlugin(pluginPath, command, filePath, key, value string) (map[string][]string, error) {
+func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value string) (map[string][]string, error) {
 	var args []string
 	switch command {
-	case "list":
-		args = []string{"list", filePath}
-	case "add":
-		args = []string{"add", filePath, key, value}
-	case "delete":
-		args = []string{"delete", filePath, key, value}
+	case PluginList:
+		args = []string{filePath}
+	case PluginAdd:
+		args = []string{filePath, key, value}
+	case PluginDelete:
+		args = []string{filePath, key, value}
 	}
 
 	cmd := exec.Command(pluginPath, args...)

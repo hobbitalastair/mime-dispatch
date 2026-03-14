@@ -3,23 +3,35 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/evanoberholster/imagemeta"
+	"github.com/spf13/pflag"
 )
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "Usage: metadata-image <command> <file>")
+	command := filepath.Base(os.Args[0])
+	if !isValidCommand(command) {
+		usage()
 		os.Exit(1)
 	}
 
-	command := os.Args[1]
-	filePath := os.Args[2]
+	flagSet := pflag.NewFlagSet(command, pflag.ContinueOnError)
+	flagSet.Usage = usage
+	if err := flagSet.Parse(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		usage()
+		os.Exit(1)
+	}
 
+	args := flagSet.Args()
 	switch command {
 	case "list":
-		err := listMetadata(filePath)
-		if err != nil {
+		if len(args) != 1 {
+			usage()
+			os.Exit(1)
+		}
+		if err := listMetadata(args[0]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -29,9 +41,22 @@ func main() {
 	case "delete":
 		fmt.Fprintln(os.Stderr, "error: this plugin is read-only, use xattr for deleting")
 		os.Exit(1)
+	}
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, "Usage (run via a command-specific symlink):")
+	fmt.Fprintln(os.Stderr, "  list <file>")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Available commands are invoked by creating symlinks named list/set/delete pointing to this binary.")
+}
+
+func isValidCommand(command string) bool {
+	switch command {
+	case "list", "set", "delete":
+		return true
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
-		os.Exit(1)
+		return false
 	}
 }
 

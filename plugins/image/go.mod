@@ -2,7 +2,10 @@ module metadata-image
 
 go 1.25.0
 
-require github.com/evanoberholster/imagemeta v0.3.1
+require (
+	github.com/evanoberholster/imagemeta v0.3.1
+	github.com/spf13/pflag v1.0.10
+)
 
 require (
 	github.com/mattn/go-colorable v0.1.13 // indirect

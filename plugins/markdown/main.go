@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -10,50 +11,39 @@ import (
 )
 
 func main() {
-	pflag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: metadata-markdown <command> <file> [args...]")
-		fmt.Fprintln(os.Stderr, "Commands: list, add, delete")
-		fmt.Fprintln(os.Stderr, "")
-		pflag.PrintDefaults()
-	}
-	pflag.Parse()
+	command := filepath.Base(os.Args[0])
 
-	args := pflag.Args()
-
-	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: metadata-markdown <command> <file> [args...]")
-		fmt.Fprintln(os.Stderr, "Commands: list, add, delete")
-		pflag.PrintDefaults()
+	flagSet := pflag.NewFlagSet(command, pflag.ContinueOnError)
+	flagSet.Usage = usage
+	if err := flagSet.Parse(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		usage()
 		os.Exit(1)
 	}
 
-	command := args[0]
-	filePath := args[1]
-	remainingArgs := args[2:]
-
+	args := flagSet.Args()
 	var err error
-
 	switch command {
 	case "list":
-		err = extractMetadata(filePath)
+		if len(args) != 1 {
+			usage()
+			os.Exit(1)
+		}
+		err = extractMetadata(args[0])
 	case "add":
-		if len(remainingArgs) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown add <file> <key> <value>")
+		if len(args) < 3 {
+			usage()
 			os.Exit(1)
 		}
-		key := remainingArgs[0]
-		value := remainingArgs[1]
-		err = addMetadata(filePath, key, value)
+		err = addMetadata(args[0], args[1], args[2])
 	case "delete":
-		if len(remainingArgs) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown delete <file> <key> <value>")
+		if len(args) < 3 {
+			usage()
 			os.Exit(1)
 		}
-		key := remainingArgs[0]
-		value := remainingArgs[1]
-		err = deleteMetadata(filePath, key, value)
+		err = deleteMetadata(args[0], args[1], args[2])
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
+		usage()
 		os.Exit(1)
 	}
 
@@ -61,6 +51,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, "Usage (run via a command-specific symlink):")
+	fmt.Fprintln(os.Stderr, "  list <file>")
+	fmt.Fprintln(os.Stderr, "  add <file> <key> <value>")
+	fmt.Fprintln(os.Stderr, "  delete <file> <key> <value>")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Available commands are invoked by creating symlinks named list/add/delete pointing to this binary.")
 }
 
 func extractMetadata(filePath string) error {

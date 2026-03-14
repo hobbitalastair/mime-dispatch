@@ -84,7 +84,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 			xattrMeta["mime_type"] = []string{mimeType}
 		}
 
-		pluginPath, err := FindPluginForCommand(mimeType, "list")
+		pluginPath, err := FindPluginForCommand(mimeType, PluginList)
 		if err != nil {
 			var noPluginErr ErrNoPluginFound
 			if errors.As(err, &noPluginErr) {
@@ -93,7 +93,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 				return nil, err
 			}
 		} else {
-			pluginMeta, err := RunPlugin(pluginPath, "list", filePath, "", "")
+			pluginMeta, err := RunPlugin(pluginPath, PluginList, filePath, "", "")
 			if err != nil {
 				return nil, err
 			}
@@ -119,9 +119,9 @@ func AddMetadata(filePath, key, value string, opts Options) error {
 		return err
 	}
 
-	pluginPath, err := FindPluginForCommand(mimeType, "add")
+	pluginPath, err := FindPluginForCommand(mimeType, PluginAdd)
 	if err == nil {
-		_, err = RunPlugin(pluginPath, "add", filePath, key, value)
+		_, err = RunPlugin(pluginPath, PluginAdd, filePath, key, value)
 		return err
 	}
 
@@ -156,52 +156,38 @@ func addToXattr(filePath, key, value string) error {
 	return SetXattr(filePath, key, encoded)
 }
 
-func xattrExists(path, key string) (bool, error) {
-	value, err := GetXattrValue(path, key)
-	if err != nil {
-		if err == ErrXattrNotSupported {
-			return false, nil
-		}
-		return false, err
-	}
-	return value != "", nil
-}
-
 func DeleteMetadata(filePath, key, value string, opts Options) error {
-	checkKeyExistsInFile := false
+	var mimeType string
+	var deletePluginPath string
 
 	if !opts.XattrOnly {
-		mimeType, err := getMimeType(filePath, opts)
+		var err error
+		mimeType, err = getMimeType(filePath, opts)
 		if err != nil {
 			return err
 		}
 
-		_, err = FindPluginForCommand(mimeType, "delete")
+		pluginPath, err := FindPluginForCommand(mimeType, PluginDelete)
 		if err != nil {
 			var noPluginErr ErrNoPluginFound
-			if errors.As(err, &noPluginErr) {
-				checkKeyExistsInFile = true
-			} else {
+			if !errors.As(err, &noPluginErr) {
 				return err
 			}
-		}
-	}
 
-	if checkKeyExistsInFile {
-		mimeType, err := getMimeType(filePath, opts)
-		if err != nil {
-			return err
-		}
-
-		pluginPath, err := FindPluginForCommand(mimeType, "list")
-		if err == nil {
-			pluginMeta, err := RunPlugin(pluginPath, "list", filePath, "", "")
-			if err != nil {
-				return err
+			// No delete plugin -- check if the key exists in the file via the list plugin,
+			// because if it does we can't delete it.
+			listPluginPath, err := FindPluginForCommand(mimeType, PluginList)
+			if err == nil {
+				pluginMeta, err := RunPlugin(listPluginPath, PluginList, filePath, "", "")
+				if err != nil {
+					return err
+				}
+				if _, keyExistsInFile := pluginMeta[key]; keyExistsInFile {
+					return fmt.Errorf("cannot delete key %q from file: file is read-only", key)
+				}
 			}
-			if _, keyExistsInFile := pluginMeta[key]; keyExistsInFile {
-				return fmt.Errorf("cannot delete key %q from file: file is read-only", key)
-			}
+		} else {
+			deletePluginPath = pluginPath
 		}
 	}
 
@@ -211,24 +197,10 @@ func DeleteMetadata(filePath, key, value string, opts Options) error {
 		}
 	}
 
-	if !opts.XattrOnly {
-		mimeType, err := getMimeType(filePath, opts)
+	if deletePluginPath != "" {
+		_, err := RunPlugin(deletePluginPath, PluginDelete, filePath, key, value)
 		if err != nil {
 			return err
-		}
-
-		pluginPath, err := FindPluginForCommand(mimeType, "delete")
-		if err != nil {
-			var noPluginErr ErrNoPluginFound
-			if errors.As(err, &noPluginErr) {
-			} else {
-				return err
-			}
-		} else {
-			_, err = RunPlugin(pluginPath, "delete", filePath, key, value)
-			if err != nil {
-				return err
-			}
 		}
 	}
 

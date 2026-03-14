@@ -141,7 +141,7 @@ func TestFindPluginForCommand_NoPlugin(t *testing.T) {
 	}()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	_, err := FindPluginForCommand("nonexistent/mimetype", "list")
+	_, err := FindPluginForCommand("nonexistent/mimetype", PluginList)
 
 	var noPluginErr ErrNoPluginFound
 	if err == nil {
@@ -180,16 +180,16 @@ func TestFindPluginForCommand_CommandSpecific(t *testing.T) {
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	// list should be found
-	pluginPath, err := FindPluginForCommand("text/markdown", "list")
+	pluginPath, err := FindPluginForCommand("text/markdown", PluginList)
 	if err != nil {
 		t.Errorf("expected to find list plugin, got error: %v", err)
 	}
-	if pluginPath != listBin {
+	if pluginPath != filepath.Join(pluginDir, "list") {
 		t.Errorf("expected plugin path %s, got %s", listBin, pluginPath)
 	}
 
 	// add should not be found
-	_, err = FindPluginForCommand("text/markdown", "add")
+	_, err = FindPluginForCommand("text/markdown", PluginAdd)
 	if err == nil {
 		t.Error("expected error when add plugin not found")
 	}

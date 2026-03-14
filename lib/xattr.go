@@ -3,7 +3,6 @@ package lib
 import (
 	"encoding/csv"
 	"errors"
-	"os"
 	"strings"
 
 	"github.com/pkg/xattr"
@@ -201,9 +200,4 @@ func DeleteXattr(path, displayName, value string) error {
 	}
 
 	return nil
-}
-
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
