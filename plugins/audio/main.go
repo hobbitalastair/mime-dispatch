@@ -23,8 +23,8 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-	case "set":
-		fmt.Fprintln(os.Stderr, "error: this plugin is read-only, use xattr for writing")
+	case "add":
+		fmt.Fprintln(os.Stderr, "error: this plugin is read-only, use xattr for adding")
 		os.Exit(1)
 	case "delete":
 		fmt.Fprintln(os.Stderr, "error: this plugin is read-only, use xattr for deleting")

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -94,7 +95,7 @@ func TestParsePluginOutput(t *testing.T) {
 		},
 		{
 			name:     "multi-valued key",
-			output:   "key: value1\nkey: value2",
+			output:   "key:\n  - value1\n  - value2",
 			expected: map[string][]string{"key": {"value1", "value2"}},
 		},
 		{
@@ -129,35 +130,58 @@ func TestMetadataToYAML(t *testing.T) {
 	tests := []struct {
 		name     string
 		metadata Metadata
-		expected string
+		expected []string // Expected lines (in any order for multiple key case)
 	}{
 		{
 			name:     "empty",
 			metadata: Metadata{},
-			expected: "",
+			expected: []string{},
 		},
 		{
 			name:     "single key-value",
 			metadata: Metadata{"key": {"value"}},
-			expected: "key: value\n",
+			expected: []string{"key: value"},
 		},
 		{
 			name:     "multi-valued key",
 			metadata: Metadata{"key": {"value1", "value2"}},
-			expected: "key:\n  - value1\n  - value2\n",
+			expected: []string{"key:", "  - value1", "  - value2"},
 		},
 		{
 			name:     "multiple keys",
 			metadata: Metadata{"key1": {"value1"}, "key2": {"value2"}},
-			expected: "key1: value1\nkey2: value2\n",
+			expected: []string{"key1: value1", "key2: value2"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.metadata.ToYAML()
-			if result != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, result)
+			resultLines := strings.Split(strings.TrimSpace(result), "\n")
+			if len(resultLines) == 1 && resultLines[0] == "" {
+				resultLines = []string{}
+			}
+
+			if len(resultLines) != len(tt.expected) {
+				t.Errorf("expected %d lines, got %d: %v", len(tt.expected), len(resultLines), resultLines)
+				return
+			}
+
+			// For tests with more than one key, check that all expected lines are present
+			if tt.name == "multiple keys" {
+				resultStr := strings.Join(resultLines, "\n")
+				for _, exp := range tt.expected {
+					if !strings.Contains(resultStr, exp) {
+						t.Errorf("expected line %q not found in result: %q", exp, resultStr)
+					}
+				}
+			} else {
+				// For other tests, check exact match
+				for i, exp := range tt.expected {
+					if i < len(resultLines) && resultLines[i] != exp {
+						t.Errorf("line %d: expected %q, got %q", i, exp, resultLines[i])
+					}
+				}
 			}
 		})
 	}

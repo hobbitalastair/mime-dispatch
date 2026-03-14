@@ -81,7 +81,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 	return result, nil
 }
 
-func SetMetadata(filePath, key, value string, opts Options) error {
+func AddMetadata(filePath, key, value string, opts Options) error {
 	keyExistedInXattr := false
 	keyExistedInFile := false
 
@@ -110,58 +110,52 @@ func SetMetadata(filePath, key, value string, opts Options) error {
 
 	// Determine where to write based on options and current state
 	if opts.XattrOnly {
-		// Explicitly xattr-only: write to xattr
-		if err := SetXattr(filePath, key, value); err != nil {
-			return err
-		}
+		// Explicitly xattr-only: add to xattr
+		return addToXattr(filePath, key, value)
 	} else if opts.FileOnly {
-		// Explicitly file-only: write to file via plugin
+		// Explicitly file-only: add to file via plugin
 		mimeType, err := getMimeType(filePath, opts)
 		if err != nil {
 			return err
 		}
 
-		pluginPath, err := FindPluginForCommand(mimeType, "set")
+		pluginPath, err := FindPluginForCommand(mimeType, "add")
 		if err != nil {
 			var noPluginErr ErrNoPluginFound
 			if errors.As(err, &noPluginErr) {
-				// No set plugin, but file-only was requested - this is an error
-				return fmt.Errorf("cannot write to file: no set plugin found for mime type %s", mimeType)
+				// No add plugin, but file-only was requested - this is an error
+				return fmt.Errorf("cannot write to file: no add plugin found for mime type %s", mimeType)
 			}
 			return err
 		}
 
-		_, err = RunPlugin(pluginPath, "set", filePath, key, value)
+		_, err = RunPlugin(pluginPath, "add", filePath, key, value)
 		if err != nil {
 			return err
 		}
 	} else {
 		// Default behavior: xattr takes precedence
 		if keyExistedInXattr {
-			// Key exists in xattr: update xattr (xattr takes precedence)
-			if err := SetXattr(filePath, key, value); err != nil {
-				return err
-			}
+			// Key exists in xattr: add to xattr (xattr takes precedence)
+			return addToXattr(filePath, key, value)
 		} else if keyExistedInFile {
-			// Key exists only in file: update file
+			// Key exists only in file: add to file
 			mimeType, err := getMimeType(filePath, opts)
 			if err != nil {
 				return err
 			}
 
-			pluginPath, err := FindPluginForCommand(mimeType, "set")
+			pluginPath, err := FindPluginForCommand(mimeType, "add")
 			if err != nil {
 				var noPluginErr ErrNoPluginFound
 				if errors.As(err, &noPluginErr) {
 					// No plugin, but key was in file before - try xattr
-					if err := SetXattr(filePath, key, value); err != nil {
-						return err
-					}
+					return addToXattr(filePath, key, value)
 				} else {
 					return err
 				}
 			} else {
-				_, err = RunPlugin(pluginPath, "set", filePath, key, value)
+				_, err = RunPlugin(pluginPath, "add", filePath, key, value)
 				if err != nil {
 					return err
 				}
@@ -173,20 +167,18 @@ func SetMetadata(filePath, key, value string, opts Options) error {
 				return err
 			}
 
-			pluginPath, err := FindPluginForCommand(mimeType, "set")
+			pluginPath, err := FindPluginForCommand(mimeType, "add")
 			if err != nil {
 				var noPluginErr ErrNoPluginFound
 				if errors.As(err, &noPluginErr) {
-					// No plugin: write to xattr (fallback)
-					if err := SetXattr(filePath, key, value); err != nil {
-						return err
-					}
+					// No plugin: add to xattr (fallback)
+					return addToXattr(filePath, key, value)
 				} else {
 					return err
 				}
 			} else {
-				// Plugin exists: write to file
-				_, err = RunPlugin(pluginPath, "set", filePath, key, value)
+				// Plugin exists: add to file
+				_, err = RunPlugin(pluginPath, "add", filePath, key, value)
 				if err != nil {
 					return err
 				}
@@ -195,6 +187,25 @@ func SetMetadata(filePath, key, value string, opts Options) error {
 	}
 
 	return nil
+}
+
+// addToXattr appends a value to an xattr key (or creates it if it doesn't exist)
+func addToXattr(filePath, key, value string) error {
+	// Get current values
+	currentValue, err := GetXattrValue(filePath, key)
+	if err != nil && err != ErrXattrNotSupported {
+		return err
+	}
+
+	// Decode current values
+	values := decodeCSV(currentValue)
+
+	// Append new value
+	values = append(values, value)
+
+	// Encode and set
+	encoded := encodeCSV(values)
+	return SetXattr(filePath, key, encoded)
 }
 
 func xattrExists(path, key string) (bool, error) {
@@ -208,7 +219,7 @@ func xattrExists(path, key string) (bool, error) {
 	return value != "", nil
 }
 
-func DeleteMetadata(filePath, key string, opts Options) error {
+func DeleteMetadata(filePath, key, value string, opts Options) error {
 	checkKeyExistsInFile := false
 
 	if !opts.XattrOnly {
@@ -247,7 +258,7 @@ func DeleteMetadata(filePath, key string, opts Options) error {
 	}
 
 	if !opts.FileOnly {
-		if err := DeleteXattr(filePath, key); err != nil {
+		if err := DeleteXattr(filePath, key, value); err != nil {
 			return err
 		}
 	}
@@ -266,7 +277,7 @@ func DeleteMetadata(filePath, key string, opts Options) error {
 				return err
 			}
 		} else {
-			_, err = RunPlugin(pluginPath, "delete", filePath, key, "")
+			_, err = RunPlugin(pluginPath, "delete", filePath, key, value)
 			if err != nil {
 				return err
 			}

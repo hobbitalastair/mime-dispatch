@@ -15,7 +15,7 @@ func main() {
 
 	pflag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: metadata <command> <file> [args...]")
-		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		fmt.Fprintln(os.Stderr, "Commands: list, add, delete")
 		fmt.Fprintln(os.Stderr, "")
 		pflag.PrintDefaults()
 	}
@@ -25,7 +25,7 @@ func main() {
 
 	if len(args) < 2 {
 		fmt.Fprintln(os.Stderr, "Usage: metadata <command> <file> [args...]")
-		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		fmt.Fprintln(os.Stderr, "Commands: list, add, delete")
 		pflag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -50,21 +50,22 @@ func main() {
 	switch command {
 	case "list":
 		err = handleList(filePath, opts)
-	case "set":
+	case "add":
 		if len(remainingArgs) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata set <file> <key> <value>")
+			fmt.Fprintln(os.Stderr, "Usage: metadata add <file> <key> <value>")
 			os.Exit(1)
 		}
 		key := remainingArgs[0]
 		value := remainingArgs[1]
-		err = handleSet(filePath, key, value, opts)
+		err = handleAdd(filePath, key, value, opts)
 	case "delete":
-		if len(remainingArgs) < 1 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata delete <file> <key>")
+		if len(remainingArgs) < 2 {
+			fmt.Fprintln(os.Stderr, "Usage: metadata delete <file> <key> <value>")
 			os.Exit(1)
 		}
 		key := remainingArgs[0]
-		err = handleDelete(filePath, key, opts)
+		value := remainingArgs[1]
+		err = handleDelete(filePath, key, value, opts)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		os.Exit(1)
@@ -85,10 +86,10 @@ func handleList(filePath string, opts lib.Options) error {
 	return nil
 }
 
-func handleSet(filePath, key, value string, opts lib.Options) error {
-	return lib.SetMetadata(filePath, key, value, opts)
+func handleAdd(filePath, key, value string, opts lib.Options) error {
+	return lib.AddMetadata(filePath, key, value, opts)
 }
 
-func handleDelete(filePath, key string, opts lib.Options) error {
-	return lib.DeleteMetadata(filePath, key, opts)
+func handleDelete(filePath, key, value string, opts lib.Options) error {
+	return lib.DeleteMetadata(filePath, key, value, opts)
 }

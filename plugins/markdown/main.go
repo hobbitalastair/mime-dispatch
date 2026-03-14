@@ -12,7 +12,7 @@ import (
 func main() {
 	pflag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: metadata-markdown <command> <file> [args...]")
-		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		fmt.Fprintln(os.Stderr, "Commands: list, add, delete")
 		fmt.Fprintln(os.Stderr, "")
 		pflag.PrintDefaults()
 	}
@@ -22,7 +22,7 @@ func main() {
 
 	if len(args) < 2 {
 		fmt.Fprintln(os.Stderr, "Usage: metadata-markdown <command> <file> [args...]")
-		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
+		fmt.Fprintln(os.Stderr, "Commands: list, add, delete")
 		pflag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -36,21 +36,22 @@ func main() {
 	switch command {
 	case "list":
 		err = extractMetadata(filePath)
-	case "set":
+	case "add":
 		if len(remainingArgs) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown set <file> <key> <value>")
+			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown add <file> <key> <value>")
 			os.Exit(1)
 		}
 		key := remainingArgs[0]
 		value := remainingArgs[1]
-		err = setMetadata(filePath, key, value)
+		err = addMetadata(filePath, key, value)
 	case "delete":
-		if len(remainingArgs) < 1 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown delete <file> <key>")
+		if len(remainingArgs) < 2 {
+			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown delete <file> <key> <value>")
 			os.Exit(1)
 		}
 		key := remainingArgs[0]
-		err = deleteMetadata(filePath, key)
+		value := remainingArgs[1]
+		err = deleteMetadata(filePath, key, value)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		os.Exit(1)
@@ -93,7 +94,7 @@ func extractMetadata(filePath string) error {
 	return nil
 }
 
-func setMetadata(filePath, key, value string) error {
+func addMetadata(filePath, key, value string) error {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -106,7 +107,20 @@ func setMetadata(filePath, key, value string) error {
 		metadata, _ = parseFrontmatter(frontmatter)
 	}
 
-	metadata[key] = value
+	// If key already exists, convert to list and append
+	if existing, ok := metadata[key]; ok {
+		switch v := existing.(type) {
+		case string:
+			// Convert single value to list and append
+			metadata[key] = []interface{}{v, value}
+		case []interface{}:
+			// Append to existing list
+			metadata[key] = append(v, value)
+		}
+	} else {
+		// New key
+		metadata[key] = value
+	}
 
 	newContent, err := serializeFrontmatter(metadata, body, hasFrontmatter)
 	if err != nil {
@@ -116,7 +130,7 @@ func setMetadata(filePath, key, value string) error {
 	return os.WriteFile(filePath, []byte(newContent), 0644)
 }
 
-func deleteMetadata(filePath, key string) error {
+func deleteMetadata(filePath, key, value string) error {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -132,7 +146,36 @@ func deleteMetadata(filePath, key string) error {
 		return err
 	}
 
-	delete(metadata, key)
+	if existing, ok := metadata[key]; ok {
+		switch v := existing.(type) {
+		case string:
+			// Single value - if it matches, delete the key
+			if v == value {
+				delete(metadata, key)
+			}
+		case []interface{}:
+			// List - remove matching value
+			var newList []interface{}
+			found := false
+			for _, item := range v {
+				if fmt.Sprintf("%v", item) != value {
+					newList = append(newList, item)
+				} else {
+					found = true
+				}
+			}
+			if found {
+				if len(newList) == 0 {
+					delete(metadata, key)
+				} else if len(newList) == 1 {
+					// Convert back to single value
+					metadata[key] = newList[0]
+				} else {
+					metadata[key] = newList
+				}
+			}
+		}
+	}
 
 	newContent, err := serializeFrontmatter(metadata, body, hasFrontmatter)
 	if err != nil {
