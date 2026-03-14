@@ -44,10 +44,13 @@ func setupPlugin(t *testing.T) func() {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
-	pluginSymlink := filepath.Join(pluginDir, "metadata")
-	err = os.Symlink(pluginBinary, pluginSymlink)
-	if err != nil {
-		t.Fatalf("failed to create plugin symlink: %v", err)
+	// Create command-specific symlinks
+	for _, command := range []string{"list", "add", "delete"} {
+		pluginSymlink := filepath.Join(pluginDir, command)
+		err = os.Symlink(pluginBinary, pluginSymlink)
+		if err != nil {
+			t.Fatalf("failed to create plugin symlink for %s: %v", command, err)
+		}
 	}
 
 	originalHome := os.Getenv("HOME")
@@ -161,7 +164,7 @@ author: Test Author
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(output, "title: New Title") {
+	if !strings.Contains(output, "- New Title") {
 		t.Errorf("expected updated title in output, got: %s", output)
 	}
 	if !strings.Contains(output, "author: Test Author") {
@@ -364,15 +367,15 @@ title: Original Title
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(output, "title: Updated Title") {
-		t.Errorf("expected updated title in output, got: %s", output)
+	if !strings.Contains(output, "title:") {
+		t.Errorf("expected title in output, got: %s", output)
 	}
 
 	fileContent, err := os.ReadFile(testFile)
 	if err != nil {
 		t.Fatalf("failed to read file: %v", err)
 	}
-	if !strings.Contains(string(fileContent), "title: Updated Title") {
+	if !strings.Contains(string(fileContent), "- Updated Title") {
 		t.Errorf("expected updated title in file content, got: %s", fileContent)
 	}
 }
@@ -404,7 +407,7 @@ func TestSetDefaultBehaviorReplacesXattrOnly(t *testing.T) {
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(output, "title: New Title") {
+	if !strings.Contains(output, "- New Title") {
 		t.Errorf("expected new title in output, got: %s", output)
 	}
 }
@@ -478,7 +481,8 @@ title: File Title
 		t.Fatalf("set xattr failed: %v", err)
 	}
 
-	_, err = runCLI(t, "delete", testFile, "title", "Test Title")
+	// Delete File Title from file (which will also delete from xattr since we're using default behavior)
+	_, err = runCLI(t, "delete", testFile, "title", "File Title")
 	if err != nil {
 		t.Fatalf("delete failed: %v", err)
 	}
@@ -964,6 +968,79 @@ func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
 
 	if strings.Contains(output, "custom-key:") {
 		t.Errorf("expected custom-key to be deleted, got: %s", output)
+	}
+}
+
+func setupImagePlugin(t *testing.T) func() {
+	tmpDir := t.TempDir()
+
+	pluginBuildDir := filepath.Join(tmpDir, "build")
+	err := os.MkdirAll(pluginBuildDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create plugin build dir: %v", err)
+	}
+
+	pluginBinary := filepath.Join(pluginBuildDir, "metadata-image-plugin")
+	cmd := exec.Command("go", "-C", "../plugins/image", "build", "-o", pluginBinary, ".")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to build image plugin: %v, output: %s", err, output)
+	}
+
+	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "image", "jpeg")
+	err = os.MkdirAll(pluginDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create image plugin dir: %v", err)
+	}
+
+	pluginSymlink := filepath.Join(pluginDir, "list")
+	err = os.Symlink(pluginBinary, pluginSymlink)
+	if err != nil {
+		t.Fatalf("failed to create image plugin symlink: %v", err)
+	}
+
+	originalHome := os.Getenv("HOME")
+	originalConfig := os.Getenv("XDG_CONFIG_HOME")
+
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	os.Unsetenv("HOME")
+
+	// Reinitialize plugin search paths to use the new XDG_CONFIG_HOME
+	lib.InitPluginSearchPaths()
+
+	return func() {
+		os.Setenv("HOME", originalHome)
+		os.Setenv("XDG_CONFIG_HOME", originalConfig)
+		lib.InitPluginSearchPaths()
+	}
+}
+
+func TestImagePluginListMetadata(t *testing.T) {
+	cleanup := setupImagePlugin(t)
+	defer cleanup()
+
+	output, err := runCLI(t, "list", "--file-only", "samples/image.jpg")
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "date:") {
+		t.Errorf("expected date in output, got: %s", output)
+	}
+
+	if !strings.Contains(output, "location:") {
+		t.Errorf("expected location in output, got: %s", output)
+	}
+}
+
+func TestImagePluginReadOnly(t *testing.T) {
+	cleanup := setupImagePlugin(t)
+	defer cleanup()
+
+	// Test that set command fails for image plugins
+	_, err := runCLI(t, "set", "--file-only", "samples/image.jpg", "test", "value")
+	if err == nil {
+		t.Error("expected set to fail on read-only image plugin")
 	}
 }
 

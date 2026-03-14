@@ -173,10 +173,10 @@ func RunPlugin(pluginPath, command, filePath, key, value string) (map[string][]s
 	switch command {
 	case "list":
 		args = []string{"list", filePath}
-	case "set":
-		args = []string{"set", filePath, key, value}
+	case "add":
+		args = []string{"add", filePath, key, value}
 	case "delete":
-		args = []string{"delete", filePath, key}
+		args = []string{"delete", filePath, key, value}
 	}
 
 	cmd := exec.Command(pluginPath, args...)
