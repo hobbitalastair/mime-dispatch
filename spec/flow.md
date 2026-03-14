@@ -2,13 +2,13 @@
 
 ## 1. Read mime type from xattr
 
-Attempt to read `user.metadata.mimetype` extended attribute. If present, use this mime type.
+Attempt to read `user.mime_type` extended attribute. If present, use this mime type.
 
 ## 2. Detect mime type if not in xattr
 
 If the xattr is not present, run the `mimetype` command on the file.
 
-If successful, store the result in `user.metadata.mimetype` xattr for future use.
+If successful, store the result in `user.mime_type` xattr for future use.
 
 If the command fails, print an error to stderr and exit with a non-zero exit code.
 

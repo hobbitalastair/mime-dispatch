@@ -1,0 +1,154 @@
+package lib
+
+type Options struct {
+	XattrOnly bool
+	FileOnly  bool
+}
+
+type Metadata map[string][]string
+
+func (m Metadata) ToYAML() string {
+	result := ""
+	for k, values := range m {
+		if len(values) == 1 {
+			result += k + ": " + values[0] + "\n"
+		} else {
+			result += k + ":\n"
+			for _, v := range values {
+				result += "  - " + v + "\n"
+			}
+		}
+	}
+	return result
+}
+
+func GetMetadata(filePath string, opts Options) (Metadata, error) {
+	result := make(Metadata)
+
+	xattrMeta := make(Metadata)
+	fileMeta := make(Metadata)
+
+	if !opts.FileOnly {
+		xattrs, err := GetXattr(filePath)
+		if err != nil && err != ErrXattrNotSupported {
+			return nil, err
+		}
+		if err == nil {
+			for k, v := range xattrs {
+				if k == MimetypeXattr {
+					continue
+				}
+				xattrMeta[k] = v
+			}
+		}
+	}
+
+	if !opts.XattrOnly {
+		mimeType, err := getMimeType(filePath, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		pluginPath, err := FindPlugin(mimeType)
+		if err != nil {
+			return nil, err
+		}
+
+		pluginMeta, err := RunPlugin(pluginPath, "EXTRACT", filePath, "", "")
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range pluginMeta {
+			fileMeta[k] = v
+		}
+	}
+
+	result = MergeMetadata(fileMeta, xattrMeta)
+
+	return result, nil
+}
+
+func SetMetadata(filePath, key, value string, opts Options) error {
+	if !opts.FileOnly {
+		if err := SetXattr(filePath, key, value); err != nil {
+			return err
+		}
+	}
+
+	if !opts.XattrOnly {
+		mimeType, err := getMimeType(filePath, opts)
+		if err != nil {
+			return err
+		}
+
+		pluginPath, err := FindPlugin(mimeType)
+		if err != nil {
+			return err
+		}
+
+		_, err = RunPlugin(pluginPath, "SET", filePath, key, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func DeleteMetadata(filePath, key string, opts Options) error {
+	if !opts.FileOnly {
+		if err := DeleteXattr(filePath, key); err != nil {
+			return err
+		}
+	}
+
+	if !opts.XattrOnly {
+		mimeType, err := getMimeType(filePath, opts)
+		if err != nil {
+			return err
+		}
+
+		pluginPath, err := FindPlugin(mimeType)
+		if err != nil {
+			return err
+		}
+
+		_, err = RunPlugin(pluginPath, "DELETE", filePath, key, "")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func getMimeType(filePath string, opts Options) (string, error) {
+	if opts.FileOnly {
+		mimeType, err := DetectMimetype(filePath)
+		if err != nil {
+			return "", err
+		}
+		return mimeType, nil
+	}
+
+	mimeType, err := GetXattrValue(filePath, MimetypeXattr)
+	if err != nil {
+		return "", err
+	}
+
+	if mimeType != "" {
+		return mimeType, nil
+	}
+
+	mimeType, err = DetectMimetype(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	if err := SetXattr(filePath, MimetypeXattr, mimeType); err != nil {
+		return "", err
+	}
+
+	return mimeType, nil
+}
