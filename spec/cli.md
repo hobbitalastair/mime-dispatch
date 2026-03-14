@@ -16,15 +16,15 @@ List all metadata from a file.
 metadata list <file>
 ```
 
-### set
-Set a metadata key/value pair.
+### add
+Add a metadata key/value pair (appends to existing values).
 
 ```
-metadata set <file> <key> <value>
+metadata add <file> <key> <value>
 ```
 
 ### delete
-Delete a metadata key/value pair.
+Delete a specific metadata key/value pair.
 
 ```
 metadata delete <file> <key> <value>
