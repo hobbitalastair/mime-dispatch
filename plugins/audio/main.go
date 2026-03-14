@@ -21,33 +21,21 @@ func main() {
 	}
 
 	args := flagSet.Args()
-	switch command {
-	case "list":
-		if len(args) != 1 {
-			usage()
-			os.Exit(1)
-		}
-		if err := listMetadata(args[0]); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-	case "add":
-		fmt.Fprintln(os.Stderr, "error: this plugin is read-only, use xattr for adding")
-		os.Exit(1)
-	case "delete":
-		fmt.Fprintln(os.Stderr, "error: this plugin is read-only, use xattr for deleting")
-		os.Exit(1)
-	default:
+	if command != "list" || len(args) != 1 {
 		usage()
+		os.Exit(1)
+	}
+
+	if err := listMetadata(args[0]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage (run via a command-specific symlink):")
-	fmt.Fprintln(os.Stderr, "  list <file>")
+	fmt.Fprintln(os.Stderr, "Usage: list <file>")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "Available commands are invoked by creating symlinks named list/add/delete pointing to this binary.")
+	fmt.Fprintln(os.Stderr, "This is a read-only plugin. Create a symlink named 'list' pointing to this binary.")
 }
 
 func listMetadata(filePath string) error {

@@ -103,7 +103,11 @@ func addMetadata(filePath, key, value string) error {
 
 	metadata := make(map[string]interface{})
 	if hasFrontmatter {
-		metadata, _ = parseFrontmatter(frontmatter)
+		parsed, err := parseFrontmatter(frontmatter)
+		if err != nil {
+			return err
+		}
+		metadata = parsed
 	}
 
 	// If key already exists, convert to list and append
@@ -242,8 +246,6 @@ func serializeFrontmatter(metadata map[string]interface{}, body string, hasFront
 		return "", err
 	}
 
-	frontmatter := string(data)
-
 	// Always include closing --- separator
-	return "---\n" + frontmatter + "---\n" + body, nil
+	return "---\n" + string(data) + "---\n" + body, nil
 }

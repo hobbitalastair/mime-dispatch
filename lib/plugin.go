@@ -88,18 +88,11 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 	switch command {
 	case PluginList:
 		args = []string{filePath}
-	case PluginAdd:
-		args = []string{filePath, key, value}
-	case PluginDelete:
+	case PluginAdd, PluginDelete:
 		args = []string{filePath, key, value}
 	}
 
 	cmd := exec.Command(pluginPath, args...)
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -115,7 +108,6 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 		return nil, err
 	}
 
-	stdin.Close()
 	output, err := io.ReadAll(stdout)
 	if err != nil {
 		cmd.Wait()
@@ -127,7 +119,6 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 
 	if cmd.ProcessState.ExitCode() != 0 {
 		return nil, PluginError{
-			Err:    string(errBytes),
 			Stderr: string(errBytes),
 		}
 	}
@@ -136,7 +127,6 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 }
 
 type PluginError struct {
-	Err    string
 	Stderr string
 }
 

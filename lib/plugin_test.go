@@ -8,18 +8,8 @@ import (
 )
 
 func TestPluginSearchPaths(t *testing.T) {
-	// Save original env
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	defer func() {
-		if originalXDG != "" {
-			os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
-		}
-	}()
-
 	// Test with XDG_CONFIG_HOME set
-	os.Setenv("XDG_CONFIG_HOME", "/custom/config")
+	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
 	paths := PluginSearchPaths()
 
 	if len(paths) != 3 {
@@ -66,17 +56,9 @@ func TestFindPluginForCommand_Precedence(t *testing.T) {
 	os.Symlink(distroBin, filepath.Join(distroDir, "list"))
 
 	// Save original env
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	defer func() {
-		if originalXDG != "" {
-			os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
-		}
-	}()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "user"))
 
 	// Test: user plugin takes precedence
-	os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "user"))
 
 	// Manually create test with overridden paths
 	paths := []string{
@@ -131,15 +113,7 @@ func TestFindPluginForCommand_NoPlugin(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Override env to use temp directory
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	defer func() {
-		if originalXDG != "" {
-			os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
-		}
-	}()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	_, err := FindPluginForCommand("nonexistent/mimetype", PluginList)
 
@@ -169,15 +143,7 @@ func TestFindPluginForCommand_CommandSpecific(t *testing.T) {
 	os.Symlink(listBin, filepath.Join(pluginDir, "list"))
 
 	// Override env
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	defer func() {
-		if originalXDG != "" {
-			os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
-		}
-	}()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	// list should be found
 	pluginPath, err := FindPluginForCommand("text/markdown", PluginList)

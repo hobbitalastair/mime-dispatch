@@ -57,10 +57,8 @@ func MergeMetadata(fileMeta, xattrMeta map[string][]string) map[string][]string 
 }
 
 func GetMetadata(filePath string, opts Options) (Metadata, error) {
-	result := make(Metadata)
-
-	xattrMeta := make(Metadata)
-	fileMeta := make(Metadata)
+	var xattrMeta Metadata
+	var fileMeta Metadata
 
 	if !opts.FileOnly {
 		xattrs, err := GetXattr(filePath)
@@ -68,9 +66,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 			return nil, err
 		}
 		if err == nil {
-			for k, v := range xattrs {
-				xattrMeta[k] = v
-			}
+			xattrMeta = xattrs
 		}
 	}
 
@@ -81,6 +77,9 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 		}
 
 		if !opts.FileOnly {
+			if xattrMeta == nil {
+				xattrMeta = make(Metadata)
+			}
 			xattrMeta["mime_type"] = []string{mimeType}
 		}
 
@@ -97,16 +96,11 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 			if err != nil {
 				return nil, err
 			}
-
-			for k, v := range pluginMeta {
-				fileMeta[k] = v
-			}
+			fileMeta = pluginMeta
 		}
 	}
 
-	result = MergeMetadata(fileMeta, xattrMeta)
-
-	return result, nil
+	return MergeMetadata(fileMeta, xattrMeta), nil
 }
 
 func AddMetadata(filePath, key, value string, opts Options) error {
@@ -209,11 +203,7 @@ func DeleteMetadata(filePath, key, value string, opts Options) error {
 
 func getMimeType(filePath string, opts Options) (string, error) {
 	if opts.FileOnly {
-		mimeType, err := DetectMimetype(filePath)
-		if err != nil {
-			return "", err
-		}
-		return mimeType, nil
+		return DetectMimetype(filePath)
 	}
 
 	mimeType, err := GetXattrValue(filePath, "mime_type")

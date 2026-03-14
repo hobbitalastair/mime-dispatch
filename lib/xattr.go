@@ -16,6 +16,14 @@ const (
 
 var ErrXattrNotSupported = errors.New("extended attributes not supported on this system")
 
+// wrapXattrErr replaces EOPNOTSUPP with ErrXattrNotSupported.
+func wrapXattrErr(err error) error {
+	if errors.Is(err, unix.EOPNOTSUPP) {
+		return ErrXattrNotSupported
+	}
+	return err
+}
+
 // encodeCSV encodes a slice of strings as a single CSV value
 func encodeCSV(values []string) string {
 	if len(values) == 0 {
@@ -28,9 +36,7 @@ func encodeCSV(values []string) string {
 	writer.Write(values)
 	writer.Flush()
 
-	// Remove trailing newline
-	result := strings.TrimSuffix(buf.String(), "\n")
-	return result
+	return strings.TrimSuffix(buf.String(), "\n")
 }
 
 // decodeCSV decodes a CSV string into a slice of strings
@@ -79,10 +85,7 @@ func GetXattr(path string) (map[string][]string, error) {
 
 	names, err := xattr.List(path)
 	if err != nil {
-		if errors.Is(err, unix.EOPNOTSUPP) {
-			return nil, ErrXattrNotSupported
-		}
-		return nil, err
+		return nil, wrapXattrErr(err)
 	}
 
 	for _, name := range names {
@@ -109,13 +112,10 @@ func GetXattrValue(path, displayName string) (string, error) {
 	key := displayNameToXattrKey(displayName)
 	value, err := xattr.Get(path, key)
 	if err != nil {
-		if errors.Is(err, unix.EOPNOTSUPP) {
-			return "", ErrXattrNotSupported
-		}
 		if errors.Is(err, xattr.ENOATTR) {
 			return "", nil
 		}
-		return "", err
+		return "", wrapXattrErr(err)
 	}
 	return string(value), nil
 }
@@ -126,12 +126,8 @@ func SetXattr(path, displayName, value string) error {
 	}
 
 	key := displayNameToXattrKey(displayName)
-	err := xattr.Set(path, key, []byte(value))
-	if err != nil {
-		if errors.Is(err, unix.EOPNOTSUPP) {
-			return ErrXattrNotSupported
-		}
-		return err
+	if err := xattr.Set(path, key, []byte(value)); err != nil {
+		return wrapXattrErr(err)
 	}
 	return nil
 }
@@ -146,13 +142,10 @@ func DeleteXattr(path, displayName, value string) error {
 	// Read current value
 	currentValue, err := xattr.Get(path, key)
 	if err != nil {
-		if errors.Is(err, unix.EOPNOTSUPP) {
-			return ErrXattrNotSupported
-		}
 		if errors.Is(err, xattr.ENOATTR) {
 			return nil
 		}
-		return err
+		return wrapXattrErr(err)
 	}
 
 	// Decode CSV values
@@ -178,25 +171,18 @@ func DeleteXattr(path, displayName, value string) error {
 	if len(newValues) == 0 {
 		err := xattr.Remove(path, key)
 		if err != nil {
-			if errors.Is(err, unix.EOPNOTSUPP) {
-				return ErrXattrNotSupported
-			}
 			if errors.Is(err, xattr.ENOATTR) {
 				return nil
 			}
-			return err
+			return wrapXattrErr(err)
 		}
 		return nil
 	}
 
 	// Encode and write back updated values
 	encoded := encodeCSV(newValues)
-	err = xattr.Set(path, key, []byte(encoded))
-	if err != nil {
-		if errors.Is(err, unix.EOPNOTSUPP) {
-			return ErrXattrNotSupported
-		}
-		return err
+	if err := xattr.Set(path, key, []byte(encoded)); err != nil {
+		return wrapXattrErr(err)
 	}
 
 	return nil

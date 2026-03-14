@@ -24,9 +24,7 @@ func main() {
 	args := pflag.Args()
 
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: metadata <command> <file> [args...]")
-		fmt.Fprintln(os.Stderr, "Commands: list, add, delete")
-		pflag.PrintDefaults()
+		pflag.Usage()
 		os.Exit(1)
 	}
 
@@ -49,23 +47,23 @@ func main() {
 
 	switch command {
 	case "list":
-		err = handleList(filePath, opts)
-	case "add":
+		metadata, e := lib.GetMetadata(filePath, opts)
+		if e != nil {
+			err = e
+		} else {
+			fmt.Print(metadata.ToYAML())
+		}
+	case "add", "delete":
 		if len(remainingArgs) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata add <file> <key> <value>")
+			fmt.Fprintf(os.Stderr, "Usage: metadata %s <file> <key> <value>\n", command)
 			os.Exit(1)
 		}
-		key := remainingArgs[0]
-		value := remainingArgs[1]
-		err = handleAdd(filePath, key, value, opts)
-	case "delete":
-		if len(remainingArgs) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: metadata delete <file> <key> <value>")
-			os.Exit(1)
+		key, value := remainingArgs[0], remainingArgs[1]
+		if command == "add" {
+			err = lib.AddMetadata(filePath, key, value, opts)
+		} else {
+			err = lib.DeleteMetadata(filePath, key, value, opts)
 		}
-		key := remainingArgs[0]
-		value := remainingArgs[1]
-		err = handleDelete(filePath, key, value, opts)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		os.Exit(1)
@@ -75,21 +73,4 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func handleList(filePath string, opts lib.Options) error {
-	metadata, err := lib.GetMetadata(filePath, opts)
-	if err != nil {
-		return err
-	}
-	fmt.Print(metadata.ToYAML())
-	return nil
-}
-
-func handleAdd(filePath, key, value string, opts lib.Options) error {
-	return lib.AddMetadata(filePath, key, value, opts)
-}
-
-func handleDelete(filePath, key, value string, opts lib.Options) error {
-	return lib.DeleteMetadata(filePath, key, value, opts)
 }

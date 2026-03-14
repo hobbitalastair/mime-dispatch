@@ -1,7 +1,7 @@
 package e2e
 
 import (
-	"io"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,148 +10,107 @@ import (
 	"testing"
 )
 
-var cliModule = "../cmd/metadata"
-var pluginModule = "../plugins/markdown"
-var audioPluginModule = "../plugins/audio"
+// testDir holds all compiled test binaries and plugin symlinks.
+// It is created in TestMain and cleaned up after tests finish.
+var testDir string
 
-var (
-	cliBinary     string
-	cliBuildOnce  sync.Once
-	cliBuildError error
+// cliBinary is the path to the compiled metadata CLI binary.
+var cliBinary string
 
-	markdownPluginBinary     string
-	markdownPluginBuildOnce  sync.Once
-	markdownPluginBuildError error
-
-	audioPluginBinary     string
-	audioPluginBuildOnce  sync.Once
-	audioPluginBuildError error
-
-	imagePluginBinary     string
-	imagePluginBuildOnce  sync.Once
-	imagePluginBuildError error
-)
-
-func buildCLI(t *testing.T) string {
-	cliBuildOnce.Do(func() {
-		// Build to a temp location that persists across all tests
-		tmpDir := os.TempDir()
-		cliBinary = filepath.Join(tmpDir, "metadata-test-cli")
-
-		cmd := exec.Command("go", "build", "-o", cliBinary, cliModule)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			cliBuildError = err
-			t.Logf("failed to build CLI: %v, output: %s", err, output)
-		}
-	})
-
-	if cliBuildError != nil {
-		t.Fatalf("CLI build failed: %v", cliBuildError)
+func TestMain(m *testing.M) {
+	var err error
+	testDir, err = os.MkdirTemp("", "metadata-e2e-*")
+	if err != nil {
+		panic(err)
 	}
 
-	return cliBinary
+	if err := buildAll(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.RemoveAll(testDir)
+		os.Exit(1)
+	}
+
+	if err := installPlugins(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.RemoveAll(testDir)
+		os.Exit(1)
+	}
+
+	// Point plugin search at our test directory.
+	os.Setenv("XDG_CONFIG_HOME", testDir)
+
+	code := m.Run()
+
+	os.RemoveAll(testDir)
+	os.Exit(code)
+}
+
+func buildAll() error {
+	builds := []struct {
+		name string
+		dir  string
+	}{
+		{"cli", "../cmd/metadata"},
+		{"markdown", "../plugins/markdown"},
+		{"audio", "../plugins/audio"},
+		{"image", "../plugins/image"},
+	}
+
+	var wg sync.WaitGroup
+	errs := make([]error, len(builds))
+	for i, b := range builds {
+		wg.Add(1)
+		go func(i int, name, dir string) {
+			defer wg.Done()
+			binary := filepath.Join(testDir, name)
+			cmd := exec.Command("go", "build", "-o", binary, ".")
+			cmd.Dir = dir
+			if output, err := cmd.CombinedOutput(); err != nil {
+				errs[i] = fmt.Errorf("failed to build %s: %v\n%s", name, err, output)
+			}
+		}(i, b.name, b.dir)
+	}
+	wg.Wait()
+
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	cliBinary = filepath.Join(testDir, "cli")
+	return nil
+}
+
+func installPlugins() error {
+	plugins := map[string]struct {
+		binary   string
+		commands []string
+	}{
+		"text/markdown":      {"markdown", []string{"list", "add", "delete"}},
+		"audio/mpeg":         {"audio", []string{"list"}},
+		"audio/ogg":          {"audio", []string{"list"}},
+		"audio/x-vorbis+ogg": {"audio", []string{"list"}},
+		"image/jpeg":         {"image", []string{"list"}},
+	}
+	for mimeType, p := range plugins {
+		dir := filepath.Join(testDir, "metadata", "plugins", mimeType)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		binary := filepath.Join(testDir, p.binary)
+		for _, cmd := range p.commands {
+			if err := os.Symlink(binary, filepath.Join(dir, cmd)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func runCLI(t *testing.T, args ...string) (string, error) {
-	binary := buildCLI(t)
-	cmd := exec.Command(binary, args...)
+	cmd := exec.Command(cliBinary, args...)
 	output, err := cmd.CombinedOutput()
 	return string(output), err
-}
-
-func buildMarkdownPlugin(t *testing.T) string {
-	markdownPluginBuildOnce.Do(func() {
-		tmpDir := os.TempDir()
-		markdownPluginBinary = filepath.Join(tmpDir, "metadata-markdown-plugin")
-
-		cmd := exec.Command("go", "build", "-o", markdownPluginBinary, pluginModule)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			markdownPluginBuildError = err
-			t.Logf("failed to build markdown plugin: %v, output: %s", err, output)
-		}
-	})
-
-	if markdownPluginBuildError != nil {
-		t.Fatalf("markdown plugin build failed: %v", markdownPluginBuildError)
-	}
-
-	return markdownPluginBinary
-}
-
-func buildAudioPlugin(t *testing.T) string {
-	audioPluginBuildOnce.Do(func() {
-		tmpDir := os.TempDir()
-		audioPluginBinary = filepath.Join(tmpDir, "metadata-audio-plugin")
-
-		cmd := exec.Command("go", "build", "-o", audioPluginBinary, ".")
-		cmd.Dir = audioPluginModule
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			audioPluginBuildError = err
-			t.Logf("failed to build audio plugin: %v, output: %s", err, output)
-		}
-	})
-
-	if audioPluginBuildError != nil {
-		t.Fatalf("audio plugin build failed: %v", audioPluginBuildError)
-	}
-
-	return audioPluginBinary
-}
-
-func buildImagePlugin(t *testing.T) string {
-	imagePluginBuildOnce.Do(func() {
-		tmpDir := os.TempDir()
-		imagePluginBinary = filepath.Join(tmpDir, "metadata-image-plugin")
-
-		cmd := exec.Command("go", "build", "-o", imagePluginBinary, ".")
-		cmd.Dir = "../plugins/image"
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			imagePluginBuildError = err
-			t.Logf("failed to build image plugin: %v, output: %s", err, output)
-		}
-	})
-
-	if imagePluginBuildError != nil {
-		t.Fatalf("image plugin build failed: %v", imagePluginBuildError)
-	}
-
-	return imagePluginBinary
-}
-
-func setupPlugin(t *testing.T) func() {
-	tmpDir := t.TempDir()
-
-	pluginBinary := buildMarkdownPlugin(t)
-
-	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "text", "markdown")
-	err := os.MkdirAll(pluginDir, 0755)
-	if err != nil {
-		t.Fatalf("failed to create plugin dir: %v", err)
-	}
-
-	// Create command-specific symlinks
-	for _, command := range []string{"list", "add", "delete"} {
-		pluginSymlink := filepath.Join(pluginDir, command)
-		err = os.Symlink(pluginBinary, pluginSymlink)
-		if err != nil {
-			t.Fatalf("failed to create plugin symlink for %s: %v", command, err)
-		}
-	}
-
-	originalHome := os.Getenv("HOME")
-	originalConfig := os.Getenv("XDG_CONFIG_HOME")
-
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	os.Unsetenv("HOME")
-
-	return func() {
-		os.Setenv("HOME", originalHome)
-		os.Setenv("XDG_CONFIG_HOME", originalConfig)
-	}
 }
 
 func TestCLIMissingArgs(t *testing.T) {
@@ -185,8 +144,6 @@ func TestCLIListMissingFile(t *testing.T) {
 }
 
 func TestMarkdownPlugin(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -224,8 +181,6 @@ func TestMarkdownPlugin(t *testing.T) {
 }
 
 func TestMarkdownPluginWithExistingFrontmatter(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -262,8 +217,6 @@ author: Test Author
 }
 
 func TestXattrOnlyList(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -299,8 +252,6 @@ author: File Author
 }
 
 func TestXattrOnlySet(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -344,8 +295,6 @@ author: File Author
 }
 
 func TestXattrOnlyDeleteFile(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -394,8 +343,6 @@ author: File Author
 }
 
 func TestSetDefaultBehaviorOnFreshFile(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -429,8 +376,6 @@ func TestSetDefaultBehaviorOnFreshFile(t *testing.T) {
 }
 
 func TestAddAppendsToExistingFileValue(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -470,8 +415,6 @@ title: Original Title
 }
 
 func TestAddAppendsToExistingXattrValue(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -502,8 +445,6 @@ func TestAddAppendsToExistingXattrValue(t *testing.T) {
 }
 
 func TestDeleteDefaultBehaviorDeletesBoth(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -543,8 +484,6 @@ title: File Title
 }
 
 func TestDeleteSpecificValueFromMultiValuedKey(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -587,8 +526,6 @@ title: First Title
 }
 
 func TestListDefaultBehaviorMergedWithPrecedence(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -632,8 +569,6 @@ author: File Author
 }
 
 func TestMultiValuedKeysYAMLFormat(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -670,8 +605,6 @@ tags:
 }
 
 func TestMimeTypeInListOutput(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -701,8 +634,6 @@ title: Test File
 }
 
 func TestFileOnlySet(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -744,8 +675,6 @@ func TestFileOnlySet(t *testing.T) {
 }
 
 func TestFileOnlyDelete(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -793,8 +722,6 @@ title: File Title
 }
 
 func TestDeleteXattrOnlyPreservesFile(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -842,8 +769,6 @@ title: File Title
 }
 
 func TestDeleteWithBothLocationsAndFlags(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -890,40 +815,7 @@ title: File Title
 	}
 }
 
-func setupAudioPlugin(t *testing.T) func() {
-	tmpDir := t.TempDir()
-
-	pluginBinary := buildAudioPlugin(t)
-
-	for _, mimeType := range []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg"} {
-		pluginParentDir := filepath.Join(tmpDir, "metadata", "plugins", mimeType)
-		err := os.MkdirAll(pluginParentDir, 0755)
-		if err != nil {
-			t.Fatalf("failed to create plugin parent dir: %v", err)
-		}
-
-		pluginSymlink := filepath.Join(pluginParentDir, "list")
-		err = os.Symlink(pluginBinary, pluginSymlink)
-		if err != nil {
-			t.Fatalf("failed to create plugin symlink: %v", err)
-		}
-	}
-
-	originalHome := os.Getenv("HOME")
-	originalConfig := os.Getenv("XDG_CONFIG_HOME")
-
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	os.Unsetenv("HOME")
-
-	return func() {
-		os.Setenv("HOME", originalHome)
-		os.Setenv("XDG_CONFIG_HOME", originalConfig)
-	}
-}
-
 func TestAudioPluginList(t *testing.T) {
-	cleanup := setupAudioPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -965,8 +857,6 @@ func TestAudioPluginList(t *testing.T) {
 }
 
 func TestAudioPluginSetFallback(t *testing.T) {
-	cleanup := setupAudioPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -992,8 +882,6 @@ func TestAudioPluginSetFallback(t *testing.T) {
 }
 
 func TestAudioPluginDeleteKeyExistsInFile(t *testing.T) {
-	cleanup := setupAudioPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -1014,8 +902,6 @@ func TestAudioPluginDeleteKeyExistsInFile(t *testing.T) {
 }
 
 func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
-	cleanup := setupAudioPlugin(t)
-	defer cleanup()
 
 	tmpDir := t.TempDir()
 
@@ -1045,38 +931,7 @@ func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
 	}
 }
 
-func setupImagePlugin(t *testing.T) func() {
-	tmpDir := t.TempDir()
-
-	pluginBinary := buildImagePlugin(t)
-
-	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "image", "jpeg")
-	err := os.MkdirAll(pluginDir, 0755)
-	if err != nil {
-		t.Fatalf("failed to create image plugin dir: %v", err)
-	}
-
-	pluginSymlink := filepath.Join(pluginDir, "list")
-	err = os.Symlink(pluginBinary, pluginSymlink)
-	if err != nil {
-		t.Fatalf("failed to create image plugin symlink: %v", err)
-	}
-
-	originalHome := os.Getenv("HOME")
-	originalConfig := os.Getenv("XDG_CONFIG_HOME")
-
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	os.Unsetenv("HOME")
-
-	return func() {
-		os.Setenv("HOME", originalHome)
-		os.Setenv("XDG_CONFIG_HOME", originalConfig)
-	}
-}
-
 func TestImagePluginListMetadata(t *testing.T) {
-	cleanup := setupImagePlugin(t)
-	defer cleanup()
 
 	output, err := runCLI(t, "list", "--file-only", "samples/image.jpg")
 	if err != nil {
@@ -1093,29 +948,18 @@ func TestImagePluginListMetadata(t *testing.T) {
 }
 
 func TestImagePluginReadOnly(t *testing.T) {
-	cleanup := setupImagePlugin(t)
-	defer cleanup()
 
-	// Test that set command fails for image plugins
-	_, err := runCLI(t, "set", "--file-only", "samples/image.jpg", "test", "value")
+	// Test that add command fails for image plugins (read-only, no add plugin)
+	_, err := runCLI(t, "add", "--file-only", "samples/image.jpg", "test", "value")
 	if err == nil {
-		t.Error("expected set to fail on read-only image plugin")
+		t.Error("expected add to fail on read-only image plugin")
 	}
 }
 
 func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
+	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	return err
+	return os.WriteFile(dst, data, 0644)
 }
