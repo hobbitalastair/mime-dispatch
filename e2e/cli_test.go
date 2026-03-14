@@ -8,30 +8,39 @@ import (
 	"testing"
 )
 
-var cliPath string
-var pluginPath string
+var cliModule = "../cmd/metadata"
+var pluginModule = "../plugins/markdown"
 
-func init() {
-	cliPath = os.Getenv("METADATA_CLI_PATH")
-	if cliPath == "" {
-		cliPath = "./metadata"
-	}
-	pluginPath = os.Getenv("METADATA_PLUGIN_PATH")
-	if pluginPath == "" {
-		pluginPath = "./metadata-markdown"
-	}
+func runCLI(t *testing.T, args ...string) (string, error) {
+	cmd := exec.Command("go", append([]string{"run", cliModule}, args...)...)
+	output, err := cmd.CombinedOutput()
+	return string(output), err
 }
 
 func setupPlugin(t *testing.T) func() {
 	tmpDir := t.TempDir()
+
+	pluginBuildDir := filepath.Join(tmpDir, "build")
+	err := os.MkdirAll(pluginBuildDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create plugin build dir: %v", err)
+	}
+
+	pluginBinary := filepath.Join(pluginBuildDir, "metadata-plugin")
+	cmd := exec.Command("go", "build", "-o", pluginBinary, pluginModule)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to build plugin: %v, output: %s", err, output)
+	}
+
 	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "text", "markdown")
-	err := os.MkdirAll(pluginDir, 0755)
+	err = os.MkdirAll(pluginDir, 0755)
 	if err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	pluginSymlink := filepath.Join(pluginDir, "metadata")
-	err = os.Symlink(pluginPath, pluginSymlink)
+	err = os.Symlink(pluginBinary, pluginSymlink)
 	if err != nil {
 		t.Fatalf("failed to create plugin symlink: %v", err)
 	}
@@ -49,34 +58,31 @@ func setupPlugin(t *testing.T) func() {
 }
 
 func TestCLIMissingArgs(t *testing.T) {
-	cmd := exec.Command(cliPath)
-	output, err := cmd.CombinedOutput()
+	output, err := runCLI(t)
 	if err == nil {
 		t.Error("expected error for missing args")
 	}
-	if !strings.Contains(string(output), "Usage") && !strings.Contains(string(output), "command") {
+	if !strings.Contains(output, "Usage") && !strings.Contains(output, "command") {
 		t.Errorf("expected usage message, got: %s", output)
 	}
 }
 
 func TestCLIUnknownCommand(t *testing.T) {
-	cmd := exec.Command(cliPath, "unknown", "test.md")
-	output, err := cmd.CombinedOutput()
+	output, err := runCLI(t, "unknown", "test.md")
 	if err == nil {
 		t.Error("expected error for unknown command")
 	}
-	if !strings.Contains(string(output), "Unknown command") && !strings.Contains(string(output), "command") {
+	if !strings.Contains(output, "Unknown command") && !strings.Contains(output, "command") {
 		t.Errorf("expected unknown command error, got: %s", output)
 	}
 }
 
 func TestCLIListMissingFile(t *testing.T) {
-	cmd := exec.Command(cliPath, "list", "nonexistent.md")
-	output, err := cmd.CombinedOutput()
+	output, err := runCLI(t, "list", "nonexistent.md")
 	if err == nil {
 		t.Error("expected error for nonexistent file")
 	}
-	if !strings.Contains(string(output), "no such file") {
+	if !strings.Contains(output, "no such file") {
 		t.Errorf("expected file not found error, got: %s", output)
 	}
 }
@@ -93,33 +99,29 @@ func TestMarkdownPlugin(t *testing.T) {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
-	cmd := exec.Command(cliPath, "set", "--file-only", testFile, "title", "Test Title")
-	output, err := cmd.CombinedOutput()
+	output, err := runCLI(t, "set", "--file-only", testFile, "title", "Test Title")
 	if err != nil {
 		t.Logf("output: %s", output)
 		t.Skip("plugin not configured")
 		return
 	}
 
-	cmd = exec.Command(cliPath, "list", "--file-only", testFile)
-	output, err = cmd.CombinedOutput()
+	output, err = runCLI(t, "list", "--file-only", testFile)
 	if err != nil {
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(string(output), "title: Test Title") {
+	if !strings.Contains(output, "title: Test Title") {
 		t.Errorf("expected title in output, got: %s", output)
 	}
 
-	cmd = exec.Command(cliPath, "delete", "--file-only", testFile, "title")
-	_, err = cmd.CombinedOutput()
+	_, err = runCLI(t, "delete", "--file-only", testFile, "title")
 	if err != nil {
 		t.Fatalf("delete failed: %v", err)
 	}
 
-	cmd = exec.Command(cliPath, "list", "--file-only", testFile)
-	output, _ = cmd.CombinedOutput()
-	if strings.TrimSpace(string(output)) != "" {
+	output, _ = runCLI(t, "list", "--file-only", testFile)
+	if strings.TrimSpace(output) != "" {
 		t.Errorf("expected empty output after delete, got: %s", output)
 	}
 }
@@ -143,23 +145,21 @@ author: Test Author
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
-	cmd := exec.Command(cliPath, "set", "--file-only", testFile, "title", "New Title")
-	_, err = cmd.CombinedOutput()
+	_, err = runCLI(t, "set", "--file-only", testFile, "title", "New Title")
 	if err != nil {
 		t.Skip("plugin not configured")
 		return
 	}
 
-	cmd = exec.Command(cliPath, "list", "--file-only", testFile)
-	output, err := cmd.CombinedOutput()
+	output, err := runCLI(t, "list", "--file-only", testFile)
 	if err != nil {
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(string(output), "title: New Title") {
+	if !strings.Contains(output, "title: New Title") {
 		t.Errorf("expected updated title in output, got: %s", output)
 	}
-	if !strings.Contains(string(output), "author: Test Author") {
+	if !strings.Contains(output, "author: Test Author") {
 		t.Errorf("expected author in output, got: %s", output)
 	}
 }
