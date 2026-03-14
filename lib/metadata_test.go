@@ -21,7 +21,7 @@ func TestMergeMetadata(t *testing.T) {
 			name:     "xattr takes precedence",
 			fileMeta: map[string][]string{"key": {"file-value"}},
 			xattrMap: map[string][]string{"key": {"xattr-value"}},
-			expected: map[string][]string{"key": {"xattr-value"}},
+			expected: map[string][]string{"key": {"file-value", "xattr-value"}},
 		},
 		{
 			name:     "merge both",
@@ -36,7 +36,7 @@ func TestMergeMetadata(t *testing.T) {
 			name:     "multi-valued keys",
 			fileMeta: map[string][]string{"key": {"value1", "value2"}},
 			xattrMap: map[string][]string{"key": {"value3"}},
-			expected: map[string][]string{"key": {"value3"}},
+			expected: map[string][]string{"key": {"value1", "value2", "value3"}},
 		},
 		{
 			name:     "mime_type from xattr included",

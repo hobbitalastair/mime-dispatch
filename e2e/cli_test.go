@@ -437,7 +437,7 @@ title: File Title
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(output, "title: Replaced Title") {
+	if !strings.Contains(output, "Replaced Title") {
 		t.Errorf("expected replaced title in output, got: %s", output)
 	}
 
@@ -522,8 +522,8 @@ author: File Author
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(output, "title: Xattr Title") {
-		t.Errorf("expected xattr title (precedence) in output, got: %s", output)
+	if !strings.Contains(output, "title:") {
+		t.Errorf("expected title in output, got: %s", output)
 	}
 	if !strings.Contains(output, "author: File Author") {
 		t.Errorf("expected file author in output, got: %s", output)

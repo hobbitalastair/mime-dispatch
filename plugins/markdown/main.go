@@ -79,7 +79,15 @@ func extractMetadata(filePath string) error {
 	}
 
 	for k, v := range metadata {
-		fmt.Printf("%s: %s\n", k, v)
+		switch val := v.(type) {
+		case string:
+			fmt.Printf("%s: %s\n", k, val)
+		case []interface{}:
+			fmt.Printf("%s:\n", k)
+			for _, item := range val {
+				fmt.Printf("  - %s\n", item)
+			}
+		}
 	}
 
 	return nil
@@ -93,7 +101,7 @@ func setMetadata(filePath, key, value string) error {
 
 	frontmatter, body, hasFrontmatter := extractFrontmatter(string(content))
 
-	metadata := make(map[string]string)
+	metadata := make(map[string]interface{})
 	if hasFrontmatter {
 		metadata, _ = parseFrontmatter(frontmatter)
 	}
@@ -158,25 +166,25 @@ func extractFrontmatter(content string) (string, string, bool) {
 	return frontmatter, body, true
 }
 
-func parseFrontmatter(frontmatter string) (map[string]string, error) {
+func parseFrontmatter(frontmatter string) (map[string]interface{}, error) {
 	if strings.TrimSpace(frontmatter) == "" {
-		return make(map[string]string), nil
+		return make(map[string]interface{}), nil
 	}
 
 	decoder := yaml.NewDecoder(strings.NewReader(frontmatter))
-	var result map[string]string
+	var result map[string]interface{}
 	if err := decoder.Decode(&result); err != nil {
 		return nil, err
 	}
 
 	if result == nil {
-		result = make(map[string]string)
+		result = make(map[string]interface{})
 	}
 
 	return result, nil
 }
 
-func serializeFrontmatter(metadata map[string]string, body string, hasFrontmatter bool) (string, error) {
+func serializeFrontmatter(metadata map[string]interface{}, body string, hasFrontmatter bool) (string, error) {
 	if len(metadata) == 0 {
 		if hasFrontmatter {
 			return strings.TrimPrefix(body, "\n"), nil

@@ -153,17 +153,31 @@ func ParsePluginOutput(output string) map[string][]string {
 	result := make(map[string][]string)
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 
+	var currentKey string
 	for _, line := range lines {
+		if strings.HasPrefix(line, "  - ") {
+			value := strings.TrimPrefix(line, "  - ")
+			if currentKey != "" {
+				result[currentKey] = append(result[currentKey], value)
+			}
+			continue
+		}
+
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 
-		parts := strings.SplitN(line, ": ", 2)
+		parts := strings.SplitN(line, ":", 2)
 		if len(parts) == 2 {
 			key := parts[0]
-			value := parts[1]
-			result[key] = append(result[key], value)
+			value := strings.TrimSpace(parts[1])
+			currentKey = key
+			if value != "" {
+				result[key] = append(result[key], value)
+			} else {
+				result[key] = []string{}
+			}
 		}
 	}
 

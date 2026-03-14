@@ -32,7 +32,7 @@ The plugin only considers file contents and ignores the file's extended attribut
 
 Metadata from both file contents and extended attributes are combined:
 
-- Xattr takes precedence on key conflicts
+- If a key exists in both locations, both values are returned
 - Multi-valued keys are merged
 
 The merged result is returned.

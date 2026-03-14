@@ -72,19 +72,41 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 
 func SetMetadata(filePath, key, value string, opts Options) error {
 	keyExistedInXattr := false
+	keyExistedInFile := false
+
 	if !opts.FileOnly {
 		existed, err := xattrExists(filePath, key)
 		if err != nil && err != ErrXattrNotSupported {
 			return err
 		}
 		keyExistedInXattr = existed
-
-		if err := SetXattr(filePath, key, value); err != nil {
-			return err
-		}
 	}
 
-	if !opts.XattrOnly && !keyExistedInXattr {
+	if !opts.XattrOnly {
+		mimeType, err := getMimeType(filePath, opts)
+		if err != nil {
+			return err
+		}
+
+		pluginPath, err := FindPlugin(mimeType)
+		if err != nil {
+			return err
+		}
+
+		pluginMeta, err := RunPlugin(pluginPath, "list", filePath, "", "")
+		if err != nil {
+			return err
+		}
+		_, keyExistedInFile = pluginMeta[key]
+	}
+
+	if opts.XattrOnly {
+		if !opts.FileOnly {
+			if err := SetXattr(filePath, key, value); err != nil {
+				return err
+			}
+		}
+	} else if opts.FileOnly {
 		mimeType, err := getMimeType(filePath, opts)
 		if err != nil {
 			return err
@@ -98,6 +120,52 @@ func SetMetadata(filePath, key, value string, opts Options) error {
 		_, err = RunPlugin(pluginPath, "set", filePath, key, value)
 		if err != nil {
 			return err
+		}
+	} else if keyExistedInXattr && !keyExistedInFile {
+		if !opts.FileOnly {
+			if err := SetXattr(filePath, key, value); err != nil {
+				return err
+			}
+		}
+	} else if keyExistedInFile && !keyExistedInXattr {
+		if !opts.XattrOnly {
+			mimeType, err := getMimeType(filePath, opts)
+			if err != nil {
+				return err
+			}
+
+			pluginPath, err := FindPlugin(mimeType)
+			if err != nil {
+				return err
+			}
+
+			_, err = RunPlugin(pluginPath, "set", filePath, key, value)
+			if err != nil {
+				return err
+			}
+		}
+	} else if keyExistedInXattr && keyExistedInFile {
+		if !opts.FileOnly {
+			if err := SetXattr(filePath, key, value); err != nil {
+				return err
+			}
+		}
+	} else if !keyExistedInXattr && !keyExistedInFile {
+		if !opts.XattrOnly {
+			mimeType, err := getMimeType(filePath, opts)
+			if err != nil {
+				return err
+			}
+
+			pluginPath, err := FindPlugin(mimeType)
+			if err != nil {
+				return err
+			}
+
+			_, err = RunPlugin(pluginPath, "set", filePath, key, value)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
