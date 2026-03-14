@@ -5,7 +5,7 @@
 - `--xattr-only` - Only access extended attributes
 - `--file-only` - Only access file contents
 
-By default, commands consider both file contents and extended attributes. Extended attributes take precedence in case of key conflicts.
+Commands apply to both file contents and extended attributes.
 
 ## Commands
 
@@ -17,17 +17,17 @@ metadata list <file>
 ```
 
 ### set
-Set a metadata key/value pair. If the key exists, it is replaced in its current location. If it exists in both locations, only xattr is replaced. If it doesn't exist, it is added to file contents.
+Set a metadata key/value pair.
 
 ```
 metadata set <file> <key> <value>
 ```
 
 ### delete
-Delete a metadata key from all locations where it exists.
+Delete a metadata key/value pair.
 
 ```
-metadata delete <file> <key>
+metadata delete <file> <key> <value>
 ```
 
 ## Output Format

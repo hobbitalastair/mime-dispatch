@@ -14,13 +14,23 @@ If the command fails, print an error to stderr and exit with a non-zero exit cod
 
 ## 3. Find plugin
 
-Search plugin directories in the following order (first match wins):
+Search for command-specific plugin:
 
-1. `$XDG_CONFIG_HOME/metadata/plugins/<mime-type>/`
-2. `/etc/metadata/plugins/<mime-type>/`
-3. `/usr/lib/metadata/plugins/<mime-type>/`
+1. `$XDG_CONFIG_HOME/metadata/plugins/<mime-type>/<command>`
+2. `/etc/metadata/plugins/<mime-type>/<command>`
+3. `/usr/lib/metadata/plugins/<mime-type>/<command>`
 
-If no plugin is found, print an error to stderr and exit with a non-zero exit code.
+Where `<command>` is `list`, `set`, or `delete`.
+
+If using --file-only and no plugin is found:
+- For `list`: Print warning to stderr and return empty metadata.
+- For `set`: Print a warning to stderr and exit with a non-zero exit code.
+- For `delete`: If the list plugin exists and the key exists in file metadata, print a warning to stderr and exit with a non-zero exit code. Otherwise, continue (xattr deleted separately).
+
+If using the default (both file and xattrs) and no plugin is found:
+- For `list`: Print warning to stderr and return just the xattr metadata.
+- For `set`: Set only in xattrs.
+- For `delete`: Delete only in xattrs. If the list plugin exists and the key exists in file metadata, print a warning to stderr and exit with a non-zero exit code.
 
 ## 4. Execute plugin
 
@@ -32,7 +42,7 @@ The plugin only considers file contents and ignores the file's extended attribut
 
 Metadata from both file contents and extended attributes are combined:
 
-- If a key exists in both locations, both values are returned
+- Xattr takes precedence on key conflicts
 - Multi-valued keys are merged
 
 The merged result is returned.
