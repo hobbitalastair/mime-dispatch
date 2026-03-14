@@ -24,5 +24,15 @@ The symlink target is managed by the package manager.
 
 ## Plugin executable CLI
 
-The plugin should use the same CLI format as the main executable, except it should only consider the file contents and ignore the file's extended attributes.
+The plugin uses the same CLI interface as the main executable:
+
+```
+<plugin-name> list <file>
+<plugin-name> set <file> <key> <value>
+<plugin-name> delete <file> <key>
+```
+
+The plugin only considers file contents and ignores the file's extended attributes.
+
+Output is flat YAML key-value pairs, same as the main executable.
 

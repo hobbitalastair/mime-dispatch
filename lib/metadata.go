@@ -54,7 +54,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 			return nil, err
 		}
 
-		pluginMeta, err := RunPlugin(pluginPath, "EXTRACT", filePath, "", "")
+		pluginMeta, err := RunPlugin(pluginPath, "list", filePath, "", "")
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func SetMetadata(filePath, key, value string, opts Options) error {
 			return err
 		}
 
-		_, err = RunPlugin(pluginPath, "SET", filePath, key, value)
+		_, err = RunPlugin(pluginPath, "set", filePath, key, value)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func DeleteMetadata(filePath, key string, opts Options) error {
 			return err
 		}
 
-		_, err = RunPlugin(pluginPath, "DELETE", filePath, key, "")
+		_, err = RunPlugin(pluginPath, "delete", filePath, key, "")
 		if err != nil {
 			return err
 		}

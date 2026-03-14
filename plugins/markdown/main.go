@@ -10,31 +10,52 @@ import (
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "Usage: metadata <command> <file>")
+		fmt.Fprintln(os.Stderr, "Usage: metadata-markdown <command> <file> [args...]")
+		fmt.Fprintln(os.Stderr, "Commands: list, set, delete")
 		os.Exit(1)
 	}
 
 	command := os.Args[1]
 	filePath := os.Args[2]
 
-	key := os.Getenv("METADATA_KEY")
-	value := os.Getenv("METADATA_VALUE")
+	var key, value string
 
-	var err error
 	switch command {
-	case "EXTRACT":
-		err = extractMetadata(filePath)
-	case "SET":
-		err = setMetadata(filePath, key, value)
-	case "DELETE":
-		err = deleteMetadata(filePath, key)
+	case "list":
+		if filePath == "" {
+			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown list <file>")
+			os.Exit(1)
+		}
+		err := extractMetadata(filePath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "set":
+		if len(os.Args) < 5 {
+			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown set <file> <key> <value>")
+			os.Exit(1)
+		}
+		key = os.Args[3]
+		value = os.Args[4]
+		err := setMetadata(filePath, key, value)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "delete":
+		if len(os.Args) < 4 {
+			fmt.Fprintln(os.Stderr, "Usage: metadata-markdown delete <file> <key>")
+			os.Exit(1)
+		}
+		key = os.Args[3]
+		err := deleteMetadata(filePath, key)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
-		os.Exit(1)
-	}
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

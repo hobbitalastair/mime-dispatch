@@ -89,13 +89,17 @@ func (e ErrNoPluginFound) Error() string {
 }
 
 func RunPlugin(pluginPath, command, filePath, key, value string) (map[string][]string, error) {
-	cmd := exec.Command(pluginPath, command, filePath)
-	if key != "" {
-		cmd.Env = append(cmd.Env, "METADATA_KEY="+key)
+	var args []string
+	switch command {
+	case "list":
+		args = []string{"list", filePath}
+	case "set":
+		args = []string{"set", filePath, key, value}
+	case "delete":
+		args = []string{"delete", filePath, key}
 	}
-	if value != "" {
-		cmd.Env = append(cmd.Env, "METADATA_VALUE="+value)
-	}
+
+	cmd := exec.Command(pluginPath, args...)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
