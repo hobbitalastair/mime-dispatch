@@ -28,6 +28,24 @@ func (m Metadata) ToYAML() string {
 	return result
 }
 
+func MergeMetadata(fileMeta, xattrMeta map[string][]string) map[string][]string {
+	result := make(map[string][]string)
+
+	for k, v := range fileMeta {
+		result[k] = v
+	}
+
+	for k, v := range xattrMeta {
+		if existing, exists := result[k]; exists {
+			result[k] = append(existing, v...)
+		} else {
+			result[k] = v
+		}
+	}
+
+	return result
+}
+
 func GetMetadata(filePath string, opts Options) (Metadata, error) {
 	result := make(Metadata)
 
@@ -82,33 +100,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 }
 
 func AddMetadata(filePath, key, value string, opts Options) error {
-	keyExistedInXattr := false
-	keyExistedInFile := false
-
-	// First, check current state only if not explicitly specifying where to write
-	if !opts.FileOnly && !opts.XattrOnly {
-		existed, err := xattrExists(filePath, key)
-		if err != nil && err != ErrXattrNotSupported {
-			return err
-		}
-		keyExistedInXattr = existed
-
-		// Check if key exists in file
-		if !opts.FileOnly {
-			mimeType, err := getMimeType(filePath, opts)
-			if err == nil {
-				pluginPath, err := FindPluginForCommand(mimeType, "list")
-				if err == nil {
-					pluginMeta, err := RunPlugin(pluginPath, "list", filePath, "", "")
-					if err == nil {
-						_, keyExistedInFile = pluginMeta[key]
-					}
-				}
-			}
-		}
-	}
-
-	// Determine where to write based on options and current state
+	// Determine where to write based on options
 	if opts.XattrOnly {
 		// Explicitly xattr-only: add to xattr
 		return addToXattr(filePath, key, value)
@@ -134,54 +126,26 @@ func AddMetadata(filePath, key, value string, opts Options) error {
 			return err
 		}
 	} else {
-		// Default behavior: xattr takes precedence
-		if keyExistedInXattr {
-			// Key exists in xattr: add to xattr (xattr takes precedence)
-			return addToXattr(filePath, key, value)
-		} else if keyExistedInFile {
-			// Key exists only in file: add to file
-			mimeType, err := getMimeType(filePath, opts)
-			if err != nil {
-				return err
-			}
+		// Write to file (default) or xattr if no plugin
+		mimeType, err := getMimeType(filePath, opts)
+		if err != nil {
+			return err
+		}
 
-			pluginPath, err := FindPluginForCommand(mimeType, "add")
-			if err != nil {
-				var noPluginErr ErrNoPluginFound
-				if errors.As(err, &noPluginErr) {
-					// No plugin, but key was in file before - try xattr
-					return addToXattr(filePath, key, value)
-				} else {
-					return err
-				}
+		pluginPath, err := FindPluginForCommand(mimeType, "add")
+		if err != nil {
+			var noPluginErr ErrNoPluginFound
+			if errors.As(err, &noPluginErr) {
+				// No plugin: add to xattr (fallback)
+				return addToXattr(filePath, key, value)
 			} else {
-				_, err = RunPlugin(pluginPath, "add", filePath, key, value)
-				if err != nil {
-					return err
-				}
+				return err
 			}
 		} else {
-			// Key doesn't exist anywhere: write to file (default) or xattr if no plugin
-			mimeType, err := getMimeType(filePath, opts)
+			// Plugin exists: add to file
+			_, err = RunPlugin(pluginPath, "add", filePath, key, value)
 			if err != nil {
 				return err
-			}
-
-			pluginPath, err := FindPluginForCommand(mimeType, "add")
-			if err != nil {
-				var noPluginErr ErrNoPluginFound
-				if errors.As(err, &noPluginErr) {
-					// No plugin: add to xattr (fallback)
-					return addToXattr(filePath, key, value)
-				} else {
-					return err
-				}
-			} else {
-				// Plugin exists: add to file
-				_, err = RunPlugin(pluginPath, "add", filePath, key, value)
-				if err != nil {
-					return err
-				}
 			}
 		}
 	}

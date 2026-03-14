@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"metadata/lib"
 )
 
 var cliModule = "../cmd/metadata"
@@ -837,13 +835,9 @@ func setupAudioPlugin(t *testing.T) func() {
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	os.Unsetenv("HOME")
 
-	// Reinitialize plugin search paths to use the new XDG_CONFIG_HOME
-	lib.InitPluginSearchPaths()
-
 	return func() {
 		os.Setenv("HOME", originalHome)
 		os.Setenv("XDG_CONFIG_HOME", originalConfig)
-		lib.InitPluginSearchPaths()
 	}
 }
 
@@ -1005,13 +999,9 @@ func setupImagePlugin(t *testing.T) func() {
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	os.Unsetenv("HOME")
 
-	// Reinitialize plugin search paths to use the new XDG_CONFIG_HOME
-	lib.InitPluginSearchPaths()
-
 	return func() {
 		os.Setenv("HOME", originalHome)
 		os.Setenv("XDG_CONFIG_HOME", originalConfig)
-		lib.InitPluginSearchPaths()
 	}
 }
 

@@ -9,19 +9,7 @@ import (
 	"strings"
 )
 
-var PluginSearchPaths []string
-
-func init() {
-	initPluginSearchPaths()
-}
-
-func initPluginSearchPaths() {
-	InitPluginSearchPaths()
-}
-
-// InitPluginSearchPaths initializes or reinitializes the plugin search paths.
-// This is primarily used by tests to reset search paths after changing XDG_CONFIG_HOME.
-func InitPluginSearchPaths() {
+func PluginSearchPaths() []string {
 	userConfigDir := os.Getenv("XDG_CONFIG_HOME")
 	if userConfigDir == "" {
 		usr, err := user.Current()
@@ -30,7 +18,7 @@ func InitPluginSearchPaths() {
 		}
 	}
 
-	PluginSearchPaths = []string{
+	return []string{
 		filepath.Join(userConfigDir, "metadata", "plugins"),
 		"/etc/metadata/plugins",
 		"/usr/lib/metadata/plugins",
@@ -38,7 +26,7 @@ func InitPluginSearchPaths() {
 }
 
 func FindPlugin(mimeType string) (string, error) {
-	for _, baseDir := range PluginSearchPaths {
+	for _, baseDir := range PluginSearchPaths() {
 		pluginDir := filepath.Join(baseDir, mimeType)
 		info, err := os.Lstat(pluginDir)
 		if err != nil {
@@ -104,7 +92,7 @@ func (e ErrNoPluginFound) Error() string {
 
 func FindPluginForCommand(mimeType, command string) (string, error) {
 	pluginPath := filepath.Join(mimeType, command)
-	for _, baseDir := range PluginSearchPaths {
+	for _, baseDir := range PluginSearchPaths() {
 		fullPath := filepath.Join(baseDir, pluginPath)
 		info, err := os.Lstat(fullPath)
 		if err == nil {
@@ -124,7 +112,7 @@ func FindPluginForCommand(mimeType, command string) (string, error) {
 	}
 
 	genericPath := mimeType
-	for _, baseDir := range PluginSearchPaths {
+	for _, baseDir := range PluginSearchPaths() {
 		fullPath := filepath.Join(baseDir, genericPath)
 
 		// First, look for a "metadata" symlink directly
