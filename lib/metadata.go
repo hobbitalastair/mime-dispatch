@@ -110,57 +110,31 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 }
 
 func AddMetadata(filePath, key, value string, opts Options) error {
-	// Determine where to write based on options
 	if opts.XattrOnly {
-		// Explicitly xattr-only: add to xattr
 		return addToXattr(filePath, key, value)
-	} else if opts.FileOnly {
-		// Explicitly file-only: add to file via plugin
-		mimeType, err := getMimeType(filePath, opts)
-		if err != nil {
-			return err
-		}
-
-		pluginPath, err := FindPluginForCommand(mimeType, "add")
-		if err != nil {
-			var noPluginErr ErrNoPluginFound
-			if errors.As(err, &noPluginErr) {
-				// No add plugin, but file-only was requested - this is an error
-				return fmt.Errorf("cannot write to file: no add plugin found for mime type %s", mimeType)
-			}
-			return err
-		}
-
-		_, err = RunPlugin(pluginPath, "add", filePath, key, value)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Write to file (default) or xattr if no plugin
-		mimeType, err := getMimeType(filePath, opts)
-		if err != nil {
-			return err
-		}
-
-		pluginPath, err := FindPluginForCommand(mimeType, "add")
-		if err != nil {
-			var noPluginErr ErrNoPluginFound
-			if errors.As(err, &noPluginErr) {
-				// No plugin: add to xattr (fallback)
-				return addToXattr(filePath, key, value)
-			} else {
-				return err
-			}
-		} else {
-			// Plugin exists: add to file
-			_, err = RunPlugin(pluginPath, "add", filePath, key, value)
-			if err != nil {
-				return err
-			}
-		}
 	}
 
-	return nil
+	mimeType, err := getMimeType(filePath, opts)
+	if err != nil {
+		return err
+	}
+
+	pluginPath, err := FindPluginForCommand(mimeType, "add")
+	if err == nil {
+		_, err = RunPlugin(pluginPath, "add", filePath, key, value)
+		return err
+	}
+
+	var noPluginErr ErrNoPluginFound
+	if !errors.As(err, &noPluginErr) {
+		return err
+	}
+
+	if opts.FileOnly {
+		return fmt.Errorf("cannot write to file: no add plugin found for mime type %s", mimeType)
+	}
+
+	return addToXattr(filePath, key, value)
 }
 
 // addToXattr appends a value to an xattr key (or creates it if it doesn't exist)
