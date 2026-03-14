@@ -35,9 +35,6 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 		}
 		if err == nil {
 			for k, v := range xattrs {
-				if k == "mime_type" {
-					continue
-				}
 				xattrMeta[k] = v
 			}
 		}
@@ -47,6 +44,10 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 		mimeType, err := getMimeType(filePath, opts)
 		if err != nil {
 			return nil, err
+		}
+
+		if !opts.FileOnly {
+			xattrMeta["mime_type"] = []string{mimeType}
 		}
 
 		pluginPath, err := FindPlugin(mimeType)
@@ -70,13 +71,20 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 }
 
 func SetMetadata(filePath, key, value string, opts Options) error {
+	keyExistedInXattr := false
 	if !opts.FileOnly {
+		existed, err := xattrExists(filePath, key)
+		if err != nil && err != ErrXattrNotSupported {
+			return err
+		}
+		keyExistedInXattr = existed
+
 		if err := SetXattr(filePath, key, value); err != nil {
 			return err
 		}
 	}
 
-	if !opts.XattrOnly {
+	if !opts.XattrOnly && !keyExistedInXattr {
 		mimeType, err := getMimeType(filePath, opts)
 		if err != nil {
 			return err
@@ -94,6 +102,17 @@ func SetMetadata(filePath, key, value string, opts Options) error {
 	}
 
 	return nil
+}
+
+func xattrExists(path, key string) (bool, error) {
+	value, err := GetXattrValue(path, key)
+	if err != nil {
+		if err == ErrXattrNotSupported {
+			return false, nil
+		}
+		return false, err
+	}
+	return value != "", nil
 }
 
 func DeleteMetadata(filePath, key string, opts Options) error {

@@ -246,7 +246,7 @@ author: File Author
 	}
 }
 
-func TestXattrOnlyDelete(t *testing.T) {
+func TestXattrOnlyDeleteFile(t *testing.T) {
 	cleanup := setupPlugin(t)
 	defer cleanup()
 
@@ -293,5 +293,501 @@ author: File Author
 	}
 	if !strings.Contains(string(fileContent), "title:") {
 		t.Errorf("expected file metadata to still exist after --xattr-only delete, got: %s", fileContent)
+	}
+}
+
+func TestSetDefaultBehaviorOnFreshFile(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	err := os.WriteFile(testFile, []byte("# Hello\n\nWorld"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", testFile, "title", "Test Title")
+	if err != nil {
+		t.Fatalf("set failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: Test Title") {
+		t.Errorf("expected title in output, got: %s", output)
+	}
+
+	fileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(fileContent), "title: Test Title") {
+		t.Errorf("expected metadata in file content, got: %s", fileContent)
+	}
+}
+
+func TestSetDefaultBehaviorReplacesFileOnly(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: Original Title
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", testFile, "title", "Updated Title")
+	if err != nil {
+		t.Fatalf("set failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: Updated Title") {
+		t.Errorf("expected updated title in output, got: %s", output)
+	}
+
+	fileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(fileContent), "title: Updated Title") {
+		t.Errorf("expected updated title in file content, got: %s", fileContent)
+	}
+}
+
+func TestSetDefaultBehaviorReplacesXattrOnly(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	err := os.WriteFile(testFile, []byte("# Hello\n\nWorld"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "title", "Xattr Title")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "set", testFile, "title", "New Title")
+	if err != nil {
+		t.Fatalf("set failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: New Title") {
+		t.Errorf("expected new title in output, got: %s", output)
+	}
+}
+
+func TestSetDefaultBehaviorReplacesBothOnlyXattr(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "title", "Xattr Title")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "set", testFile, "title", "Replaced Title")
+	if err != nil {
+		t.Fatalf("set failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: Replaced Title") {
+		t.Errorf("expected replaced title in output, got: %s", output)
+	}
+
+	fileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(fileContent), "title: File Title") {
+		t.Errorf("expected original file title preserved, got: %s", fileContent)
+	}
+}
+
+func TestDeleteDefaultBehaviorDeletesBoth(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "title", "Xattr Title")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "delete", testFile, "title")
+	if err != nil {
+		t.Fatalf("delete failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if strings.Contains(output, "title:") {
+		t.Errorf("expected title to be deleted from both locations, got: %s", output)
+	}
+}
+
+func TestListDefaultBehaviorMergedWithPrecedence(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+author: File Author
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "title", "Xattr Title")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "xattr-only-key", "xattr-value")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: Xattr Title") {
+		t.Errorf("expected xattr title (precedence) in output, got: %s", output)
+	}
+	if !strings.Contains(output, "author: File Author") {
+		t.Errorf("expected file author in output, got: %s", output)
+	}
+	if !strings.Contains(output, "xattr-only-key: xattr-value") {
+		t.Errorf("expected xattr-only key in output, got: %s", output)
+	}
+}
+
+func TestMultiValuedKeysYAMLFormat(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+tags:
+  - file-value1
+  - file-value2
+---
+
+# Hello World
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "tags", "xattr-value")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "tags:") {
+		t.Errorf("expected tags in output, got: %s", output)
+	}
+	if !strings.Contains(output, "- file-value1") || !strings.Contains(output, "- file-value2") || !strings.Contains(output, "- xattr-value") {
+		t.Errorf("expected multi-valued YAML sequence format with merged values, got: %s", output)
+	}
+}
+
+func TestMimeTypeInListOutput(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: Test File
+---
+
+# Hello World
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "mime_type:") {
+		t.Errorf("expected mime_type in output, got: %s", output)
+	}
+	if !strings.Contains(output, "text/markdown") {
+		t.Errorf("expected text/markdown in output, got: %s", output)
+	}
+}
+
+func TestFileOnlySet(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	err := os.WriteFile(testFile, []byte("# Hello\n\nWorld"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--file-only", testFile, "title", "File Title")
+	if err != nil {
+		t.Fatalf("set --file-only failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: File Title") {
+		t.Errorf("expected title in output, got: %s", output)
+	}
+
+	fileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(fileContent), "title: File Title") {
+		t.Errorf("expected title in file content, got: %s", fileContent)
+	}
+
+	xattrOutput, err := runCLI(t, "list", "--xattr-only", testFile)
+	if err != nil {
+		t.Fatalf("list --xattr-only failed: %v, output: %s", err, xattrOutput)
+	}
+	if strings.Contains(xattrOutput, "title:") {
+		t.Errorf("expected no title in xattr when using --file-only, got: %s", xattrOutput)
+	}
+}
+
+func TestFileOnlyDelete(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "title", "Xattr Title")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "delete", "--file-only", testFile, "title")
+	if err != nil {
+		t.Fatalf("delete --file-only failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if strings.Contains(output, "title: File Title") {
+		t.Errorf("expected file title to be deleted, got: %s", output)
+	}
+	if !strings.Contains(output, "title: Xattr Title") {
+		t.Errorf("expected xattr title to remain, got: %s", output)
+	}
+
+	fileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if strings.Contains(string(fileContent), "title:") {
+		t.Errorf("expected title to be removed from file content, got: %s", fileContent)
+	}
+}
+
+func TestDeleteXattrOnlyPreservesFile(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "title", "Xattr Title")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "delete", "--xattr-only", testFile, "title")
+	if err != nil {
+		t.Fatalf("delete --xattr-only failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: File Title") {
+		t.Errorf("expected file title to remain, got: %s", output)
+	}
+	if strings.Contains(output, "title: Xattr Title") {
+		t.Errorf("expected xattr title to be deleted, got: %s", output)
+	}
+
+	xattrOutput, err := runCLI(t, "list", "--xattr-only", testFile)
+	if err != nil {
+		t.Fatalf("list --xattr-only failed: %v, output: %s", err, xattrOutput)
+	}
+	if strings.Contains(xattrOutput, "title:") {
+		t.Errorf("expected title to be removed from xattr, got: %s", xattrOutput)
+	}
+}
+
+func TestDeleteWithBothLocationsAndFlags(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: File Title
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "title", "Xattr Title")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "xattr-only-key", "xattr-value")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	_, err = runCLI(t, "delete", "--xattr-only", testFile, "title")
+	if err != nil {
+		t.Fatalf("delete --xattr-only failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: File Title") {
+		t.Errorf("expected file title to remain, got: %s", output)
+	}
+	if strings.Contains(output, "title: Xattr Title") {
+		t.Errorf("expected xattr title to be deleted, got: %s", output)
+	}
+	if !strings.Contains(output, "xattr-only-key: xattr-value") {
+		t.Errorf("expected xattr-only-key to remain, got: %s", output)
 	}
 }

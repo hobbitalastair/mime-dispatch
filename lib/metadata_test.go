@@ -38,6 +38,16 @@ func TestMergeMetadata(t *testing.T) {
 			xattrMap: map[string][]string{"key": {"value3"}},
 			expected: map[string][]string{"key": {"value3"}},
 		},
+		{
+			name:     "mime_type from xattr included",
+			fileMeta: map[string][]string{"title": {"File Title"}},
+			xattrMap: map[string][]string{"mime_type": {"text/markdown"}, "author": {"Test Author"}},
+			expected: map[string][]string{
+				"title":     {"File Title"},
+				"mime_type": {"text/markdown"},
+				"author":    {"Test Author"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
