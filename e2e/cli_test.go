@@ -1,15 +1,20 @@
 package e2e
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"metadata/lib"
 )
 
 var cliModule = "../cmd/metadata"
 var pluginModule = "../plugins/markdown"
+
+var audioPluginModule = "../plugins/audio"
 
 func runCLI(t *testing.T, args ...string) (string, error) {
 	cmd := exec.Command("go", append([]string{"run", cliModule}, args...)...)
@@ -790,4 +795,191 @@ title: File Title
 	if !strings.Contains(output, "xattr-only-key: xattr-value") {
 		t.Errorf("expected xattr-only-key to remain, got: %s", output)
 	}
+}
+
+func setupAudioPlugin(t *testing.T) func() {
+	tmpDir := t.TempDir()
+
+	pluginBuildDir := filepath.Join(tmpDir, "build")
+	err := os.MkdirAll(pluginBuildDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create plugin build dir: %v", err)
+	}
+
+	pluginBinary := filepath.Join(pluginBuildDir, "metadata-plugin")
+	cmd := exec.Command("go", "-C", "../plugins/audio", "build", "-o", pluginBinary, ".")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to build audio plugin: %v, output: %s", err, output)
+	}
+
+	for _, mimeType := range []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg"} {
+		pluginParentDir := filepath.Join(tmpDir, "metadata", "plugins", mimeType)
+		err = os.MkdirAll(pluginParentDir, 0755)
+		if err != nil {
+			t.Fatalf("failed to create plugin parent dir: %v", err)
+		}
+
+		pluginSymlink := filepath.Join(pluginParentDir, "list")
+		err = os.Symlink(pluginBinary, pluginSymlink)
+		if err != nil {
+			t.Fatalf("failed to create plugin symlink: %v", err)
+		}
+	}
+
+	originalHome := os.Getenv("HOME")
+	originalConfig := os.Getenv("XDG_CONFIG_HOME")
+
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	os.Unsetenv("HOME")
+
+	// Reinitialize plugin search paths to use the new XDG_CONFIG_HOME
+	lib.InitPluginSearchPaths()
+
+	return func() {
+		os.Setenv("HOME", originalHome)
+		os.Setenv("XDG_CONFIG_HOME", originalConfig)
+		lib.InitPluginSearchPaths()
+	}
+}
+
+func TestAudioPluginList(t *testing.T) {
+	cleanup := setupAudioPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testMp3 := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testMp3)
+	if err != nil {
+		t.Fatalf("failed to copy mp3 file: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testMp3)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title:") {
+		t.Errorf("expected title in output, got: %s", output)
+	}
+	if !strings.Contains(output, "artist:") {
+		t.Errorf("expected artist in output, got: %s", output)
+	}
+	if !strings.Contains(output, "album:") {
+		t.Errorf("expected album in output, got: %s", output)
+	}
+
+	testOgg := filepath.Join(tmpDir, "test.ogg")
+	err = copyFile("samples/sample1.ogg", testOgg)
+	if err != nil {
+		t.Fatalf("failed to copy ogg file: %v", err)
+	}
+
+	output, err = runCLI(t, "list", "--file-only", testOgg)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if !strings.Contains(output, "title: Everdusk Rescue") {
+		t.Errorf("expected title in output, got: %s", output)
+	}
+}
+
+func TestAudioPluginSetFallback(t *testing.T) {
+	cleanup := setupAudioPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("failed to copy test file: %v", err)
+	}
+
+	output, err := runCLI(t, "set", testFile, "custom-key", "custom-value")
+	if err != nil {
+		t.Fatalf("set failed: %v, output: %s", err, output)
+	}
+
+	listOutput, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, listOutput)
+	}
+
+	if !strings.Contains(listOutput, "custom-key: custom-value") {
+		t.Errorf("expected custom-key in output (xattr fallback), got: %s", listOutput)
+	}
+}
+
+func TestAudioPluginDeleteKeyExistsInFile(t *testing.T) {
+	cleanup := setupAudioPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("failed to copy test file: %v", err)
+	}
+
+	delOutput, err := runCLI(t, "delete", testFile, "title")
+	if err == nil {
+		t.Error("expected error when deleting key that exists in file")
+	}
+
+	if !strings.Contains(delOutput, "read-only") {
+		t.Errorf("expected error about read-only, got: %v, output: %s", err, delOutput)
+	}
+}
+
+func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
+	cleanup := setupAudioPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("failed to copy test file: %v", err)
+	}
+
+	_, err = runCLI(t, "set", "--xattr-only", testFile, "custom-key", "custom-value")
+	if err != nil {
+		t.Fatalf("set xattr failed: %v", err)
+	}
+
+	delOutput, err := runCLI(t, "delete", testFile, "custom-key")
+	if err != nil {
+		t.Fatalf("delete failed: %v, output: %s", err, delOutput)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	if strings.Contains(output, "custom-key:") {
+		t.Errorf("expected custom-key to be deleted, got: %s", output)
+	}
+}
+
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	return err
 }
