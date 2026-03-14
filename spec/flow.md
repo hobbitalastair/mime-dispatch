@@ -20,16 +20,16 @@ Search for command-specific plugin:
 2. `/etc/metadata/plugins/<mime-type>/<command>`
 3. `/usr/lib/metadata/plugins/<mime-type>/<command>`
 
-Where `<command>` is `list`, `set`, or `delete`.
+Where `<command>` is `list`, `add`, or `delete`.
 
 If using --file-only and no plugin is found:
 - For `list`: Print warning to stderr and return empty metadata.
-- For `set`: Print a warning to stderr and exit with a non-zero exit code.
+- For `add`: Print a warning to stderr and exit with a non-zero exit code.
 - For `delete`: If the list plugin exists and the key exists in file metadata, print a warning to stderr and exit with a non-zero exit code. Otherwise, continue (xattr deleted separately).
 
 If using the default (both file and xattrs) and no plugin is found:
 - For `list`: Print warning to stderr and return just the xattr metadata.
-- For `set`: Set only in xattrs.
+- For `add`: Set only in xattrs.
 - For `delete`: Delete only in xattrs. If the list plugin exists and the key exists in file metadata, print a warning to stderr and exit with a non-zero exit code.
 
 ## 4. Execute plugin
@@ -40,9 +40,6 @@ The plugin only considers file contents and ignores the file's extended attribut
 
 ## 5. Merge metadata
 
-Metadata from both file contents and extended attributes are combined:
-
-- Xattr takes precedence on key conflicts
-- Multi-valued keys are merged
+Metadata from both file contents and extended attributes are combined. Keys may be multi valued, but duplicates (the same entry in xattr and in the file) should be removed.
 
 The merged result is returned.
