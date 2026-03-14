@@ -12,12 +12,12 @@ This allows users to override system-provided plugins.
 
 ## Plugin Directory Structure
 
-Each mime type has its own directory containing a symlink to the plugin executable:
+Each mime type has its own directory (using the full mime type with slashes) containing a symlink to the plugin executable:
 
 ```
-/usr/lib/metadata/plugins/image/jpeg/metadata
+/usr/lib/metadata/plugins/text/markdown/metadata
 /etc/metadata/plugins/text/markdown/metadata
-$XDG_CONFIG_HOME/metadata/plugins/audio/mp3/metadata
+$XDG_CONFIG_HOME/metadata/plugins/text/markdown/metadata
 ```
 
 The symlink target is managed by the package manager.

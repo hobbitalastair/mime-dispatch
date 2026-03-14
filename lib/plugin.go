@@ -29,7 +29,7 @@ func init() {
 
 func FindPlugin(mimeType string) (string, error) {
 	for _, baseDir := range PluginSearchPaths {
-		pluginDir := filepath.Join(baseDir, strings.ReplaceAll(mimeType, "/", "."))
+		pluginDir := filepath.Join(baseDir, mimeType)
 		info, err := os.Lstat(pluginDir)
 		if err != nil {
 			continue

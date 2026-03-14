@@ -24,7 +24,7 @@ func init() {
 
 func setupPlugin(t *testing.T) func() {
 	tmpDir := t.TempDir()
-	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "text.markdown")
+	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "text", "markdown")
 	err := os.MkdirAll(pluginDir, 0755)
 	if err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
