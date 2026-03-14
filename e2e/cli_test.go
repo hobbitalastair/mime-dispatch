@@ -11,7 +11,6 @@ import (
 
 var cliModule = "../cmd/metadata"
 var pluginModule = "../plugins/markdown"
-
 var audioPluginModule = "../plugins/audio"
 
 func runCLI(t *testing.T, args ...string) (string, error) {
@@ -191,7 +190,7 @@ author: File Author
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "xattr-key", "xattr-value")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", "--xattr-only", testFile)
@@ -228,7 +227,7 @@ author: File Author
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "xattr-key", "xattr-value")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", testFile)
@@ -273,7 +272,7 @@ author: File Author
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "xattr-key", "xattr-value")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	_, err = runCLI(t, "delete", "--xattr-only", testFile, "xattr-key", "xattr-value")
@@ -316,7 +315,7 @@ func TestSetDefaultBehaviorOnFreshFile(t *testing.T) {
 
 	_, err = runCLI(t, "add", testFile, "title", "Test Title")
 	if err != nil {
-		t.Fatalf("set failed: %v", err)
+		t.Fatalf("add failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", testFile)
@@ -337,7 +336,7 @@ func TestSetDefaultBehaviorOnFreshFile(t *testing.T) {
 	}
 }
 
-func TestSetDefaultBehaviorReplacesFileOnly(t *testing.T) {
+func TestAddAppendsToExistingFileValue(t *testing.T) {
 	cleanup := setupPlugin(t)
 	defer cleanup()
 
@@ -357,7 +356,7 @@ title: Original Title
 
 	_, err = runCLI(t, "add", testFile, "title", "Updated Title")
 	if err != nil {
-		t.Fatalf("set failed: %v", err)
+		t.Fatalf("add failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", testFile)
@@ -378,7 +377,7 @@ title: Original Title
 	}
 }
 
-func TestSetDefaultBehaviorReplacesXattrOnly(t *testing.T) {
+func TestAddAppendsToExistingXattrValue(t *testing.T) {
 	cleanup := setupPlugin(t)
 	defer cleanup()
 
@@ -392,12 +391,12 @@ func TestSetDefaultBehaviorReplacesXattrOnly(t *testing.T) {
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "Xattr Title")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	_, err = runCLI(t, "add", testFile, "title", "New Title")
 	if err != nil {
-		t.Fatalf("set failed: %v", err)
+		t.Fatalf("add failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", testFile)
@@ -407,52 +406,6 @@ func TestSetDefaultBehaviorReplacesXattrOnly(t *testing.T) {
 
 	if !strings.Contains(output, "- New Title") {
 		t.Errorf("expected new title in output, got: %s", output)
-	}
-}
-
-func TestSetDefaultBehaviorReplacesBothOnlyXattr(t *testing.T) {
-	cleanup := setupPlugin(t)
-	defer cleanup()
-
-	tmpDir := t.TempDir()
-
-	testFile := filepath.Join(tmpDir, "test.md")
-	content := `---
-title: File Title
----
-
-# Hello
-`
-	err := os.WriteFile(testFile, []byte(content), 0644)
-	if err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
-
-	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "Xattr Title")
-	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
-	}
-
-	_, err = runCLI(t, "add", testFile, "title", "Replaced Title")
-	if err != nil {
-		t.Fatalf("set failed: %v", err)
-	}
-
-	output, err := runCLI(t, "list", testFile)
-	if err != nil {
-		t.Fatalf("list failed: %v, output: %s", err, output)
-	}
-
-	if !strings.Contains(output, "Replaced Title") {
-		t.Errorf("expected replaced title in output, got: %s", output)
-	}
-
-	fileContent, err := os.ReadFile(testFile)
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
-	if !strings.Contains(string(fileContent), "title: File Title") {
-		t.Errorf("expected original file title preserved, got: %s", fileContent)
 	}
 }
 
@@ -474,12 +427,13 @@ title: File Title
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
-	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "Xattr Title")
+	// Add the same value to xattr as well
+	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "File Title")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
-	// Delete File Title from file (which will also delete from xattr since we're using default behavior)
+	// Delete the value from both (default behavior deletes from both locations)
 	_, err = runCLI(t, "delete", testFile, "title", "File Title")
 	if err != nil {
 		t.Fatalf("delete failed: %v", err)
@@ -490,8 +444,53 @@ title: File Title
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
+	// Title should be completely gone from both locations
 	if strings.Contains(output, "title:") {
 		t.Errorf("expected title to be deleted from both locations, got: %s", output)
+	}
+}
+
+func TestDeleteSpecificValueFromMultiValuedKey(t *testing.T) {
+	cleanup := setupPlugin(t)
+	defer cleanup()
+
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	content := `---
+title: First Title
+---
+
+# Hello
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	// Add a second title value (creates multi-valued)
+	_, err = runCLI(t, "add", "--file-only", testFile, "title", "Second Title")
+	if err != nil {
+		t.Fatalf("add second title failed: %v", err)
+	}
+
+	// Delete only the first value
+	_, err = runCLI(t, "delete", "--file-only", testFile, "title", "First Title")
+	if err != nil {
+		t.Fatalf("delete failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", testFile)
+	if err != nil {
+		t.Fatalf("list failed: %v, output: %s", err, output)
+	}
+
+	// Second title should remain (normalized to scalar since only one value), first should be gone
+	if !strings.Contains(output, "title: Second Title") {
+		t.Errorf("expected second title to remain, got: %s", output)
+	}
+	if strings.Contains(output, "First Title") {
+		t.Errorf("expected first title to be deleted, got: %s", output)
 	}
 }
 
@@ -516,12 +515,12 @@ author: File Author
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "Xattr Title")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "xattr-only-key", "xattr-value")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", testFile)
@@ -562,7 +561,7 @@ tags:
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "tags", "xattr-value")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", testFile)
@@ -623,7 +622,7 @@ func TestFileOnlySet(t *testing.T) {
 
 	_, err = runCLI(t, "add", "--file-only", testFile, "title", "File Title")
 	if err != nil {
-		t.Fatalf("set --file-only failed: %v", err)
+		t.Fatalf("add --file-only failed: %v", err)
 	}
 
 	output, err := runCLI(t, "list", testFile)
@@ -672,7 +671,7 @@ title: File Title
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "Xattr Title")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	_, err = runCLI(t, "delete", "--file-only", testFile, "title", "File Title")
@@ -721,7 +720,7 @@ title: File Title
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "Xattr Title")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	_, err = runCLI(t, "delete", "--xattr-only", testFile, "title", "Xattr Title")
@@ -770,12 +769,12 @@ title: File Title
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "title", "Xattr Title")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "xattr-only-key", "xattr-value")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	_, err = runCLI(t, "delete", "--xattr-only", testFile, "title", "Xattr Title")
@@ -898,7 +897,7 @@ func TestAudioPluginSetFallback(t *testing.T) {
 
 	output, err := runCLI(t, "add", testFile, "custom-key", "custom-value")
 	if err != nil {
-		t.Fatalf("set failed: %v, output: %s", err, output)
+		t.Fatalf("add failed: %v, output: %s", err, output)
 	}
 
 	listOutput, err := runCLI(t, "list", testFile)
@@ -947,7 +946,7 @@ func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
 
 	_, err = runCLI(t, "add", "--xattr-only", testFile, "custom-key", "custom-value")
 	if err != nil {
-		t.Fatalf("set xattr failed: %v", err)
+		t.Fatalf("add xattr failed: %v", err)
 	}
 
 	delOutput, err := runCLI(t, "delete", testFile, "custom-key", "custom-value")

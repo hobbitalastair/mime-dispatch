@@ -167,10 +167,8 @@ func deleteMetadata(filePath, key, value string) error {
 			if found {
 				if len(newList) == 0 {
 					delete(metadata, key)
-				} else if len(newList) == 1 {
-					// Convert back to single value
-					metadata[key] = newList[0]
 				} else {
+					// Keep as list even if only one element remains
 					metadata[key] = newList
 				}
 			}
@@ -193,7 +191,7 @@ func extractFrontmatter(content string) (string, string, bool) {
 	}
 
 	var frontmatterLines []string
-	bodyStart := 1
+	bodyStart := -1
 
 	for i := 1; i < len(lines); i++ {
 		if strings.TrimSpace(lines[i]) == "---" {
@@ -201,6 +199,11 @@ func extractFrontmatter(content string) (string, string, bool) {
 			break
 		}
 		frontmatterLines = append(frontmatterLines, lines[i])
+	}
+
+	// If no closing --- found, this is not valid frontmatter
+	if bodyStart == -1 {
+		return "", content, false
 	}
 
 	frontmatter := strings.Join(frontmatterLines, "\n")
@@ -242,9 +245,6 @@ func serializeFrontmatter(metadata map[string]interface{}, body string, hasFront
 
 	frontmatter := string(data)
 
-	if hasFrontmatter {
-		return "---\n" + frontmatter + body, nil
-	}
-
-	return "---\n" + frontmatter + "---\n\n" + body, nil
+	// Always include closing --- separator
+	return "---\n" + frontmatter + "---\n" + body, nil
 }
