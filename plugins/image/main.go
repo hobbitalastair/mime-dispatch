@@ -21,7 +21,7 @@ func main() {
 	}
 
 	args := flagSet.Args()
-	if command != "list" || len(args) != 1 {
+	if command != "metadata-list" || len(args) != 1 {
 		usage()
 		os.Exit(1)
 	}
@@ -33,9 +33,9 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: list <file>")
+	fmt.Fprintln(os.Stderr, "Usage: metadata-list <file>")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "This is a read-only plugin. Create a symlink named 'list' pointing to this binary.")
+	fmt.Fprintln(os.Stderr, "This is a read-only plugin. Create a symlink named 'metadata-list' pointing to this binary.")
 }
 
 func listMetadata(filePath string) error {

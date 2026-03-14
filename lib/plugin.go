@@ -20,11 +20,11 @@ const (
 func (c PluginCommand) String() string {
 	switch c {
 	case PluginList:
-		return "list"
+		return "metadata-list"
 	case PluginAdd:
-		return "add"
+		return "metadata-add"
 	case PluginDelete:
-		return "delete"
+		return "metadata-delete"
 	default:
 		return "unknown"
 	}
@@ -40,9 +40,9 @@ func PluginSearchPaths() []string {
 	}
 
 	return []string{
-		filepath.Join(userConfigDir, "metadata", "plugins"),
-		"/etc/metadata/plugins",
-		"/usr/lib/metadata/plugins",
+		filepath.Join(userConfigDir, "mimetype"),
+		"/etc/mimetype",
+		"/usr/lib/mimetype",
 	}
 }
 

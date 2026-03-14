@@ -86,14 +86,14 @@ func installPlugins() error {
 		binary   string
 		commands []string
 	}{
-		"text/markdown":      {"markdown", []string{"list", "add", "delete"}},
-		"audio/mpeg":         {"audio", []string{"list"}},
-		"audio/ogg":          {"audio", []string{"list"}},
-		"audio/x-vorbis+ogg": {"audio", []string{"list"}},
-		"image/jpeg":         {"image", []string{"list"}},
+		"text/markdown":      {"markdown", []string{"metadata-list", "metadata-add", "metadata-delete"}},
+		"audio/mpeg":         {"audio", []string{"metadata-list"}},
+		"audio/ogg":          {"audio", []string{"metadata-list"}},
+		"audio/x-vorbis+ogg": {"audio", []string{"metadata-list"}},
+		"image/jpeg":         {"image", []string{"metadata-list"}},
 	}
 	for mimeType, p := range plugins {
-		dir := filepath.Join(testDir, "metadata", "plugins", mimeType)
+		dir := filepath.Join(testDir, "mimetype", mimeType)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}

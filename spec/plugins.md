@@ -1,43 +1,28 @@
 # Plugin Structure
 
-## Plugin Search Paths
+To support a new mime type, helper binaries must be placed in mime type specific directories.
 
-Plugins are discovered by searching directories in the following order (first match wins):
+The supported helpers are:
 
-1. `$XDG_CONFIG_HOME/metadata/plugins/<mime-type>/` (user)
-2. `/etc/metadata/plugins/<mime-type>/` (admin)
-3. `/usr/lib/metadata/plugins/<mime-type>/` (distro)
-
-This allows users to override system-provided plugins.
-
-## Plugin Directory Structure
-
-Each mime type has its own directory containing command-specific symlinks:
-
-```
-/usr/lib/metadata/plugins/audio/mpeg/list
-/usr/lib/metadata/plugins/audio/mpeg/add
-/usr/lib/metadata/plugins/audio/mpeg/delete
-```
-
-Supported commands: `list`, `add`, `delete`. `list` is not optional. `add` and `delete` are optional.
-
-- `list`: Extracts metadata from file contents.
-- `add`: Adds metadata to file contents (appends to existing values).
-- `delete`: Deletes metadata from file contents.
-
-The symlink target is managed by the package manager.
-
-## Plugin executable CLI
-
-The plugin uses the same CLI interface as the main executable:
-
-```
-list <file>
-add <file> <key> <value>
-delete <file> <key> <value>
-```
-
-The plugin only considers file contents and ignores the file's extended attributes.
+- `metadata-list <file>`: Extracts metadata from file contents.
+- `metadata-add <file> <key> <value>`: Adds metadata to file contents (appends to existing values). Optional.
+- `metadata-delete <file> <key> <value>`: Deletes metadata from file contents. Optional.
 
 Output is YAML-like, same as the main executable.
+
+These directories are searched in the following order (first match wins):
+
+1. `$XDG_CONFIG_HOME/mimetype/<mime-type>/` (user)
+2. `/etc/mimetype/<mime-type>/` (admin)
+3. `/usr/lib/mimetype/<mime-type>/` (distro)
+
+For example, the `audio/mpeg` mime type may be supported by binaries or symlinks to binaries like this:
+
+```
+/usr/lib/mimetype/audio/mpeg/metadata-list
+/usr/lib/mimetype/audio/mpeg/metadata-add
+/usr/lib/mimetype/audio/mpeg/metadata-delete
+```
+
+If a `metadata-list` binary is placed into `$XDG_CONFIG_HOME/mimetype/audio/mpeg/` it will be used in preference to the system one in `/usr/lib/mimetype`.
+

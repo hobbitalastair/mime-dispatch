@@ -16,16 +16,16 @@ func TestPluginSearchPaths(t *testing.T) {
 		t.Errorf("expected 3 search paths, got %d", len(paths))
 	}
 
-	if paths[0] != "/custom/config/metadata/plugins" {
+	if paths[0] != "/custom/config/mimetype" {
 		t.Errorf("expected first path to be XDG_CONFIG_HOME based, got %s", paths[0])
 	}
 
-	if paths[1] != "/etc/metadata/plugins" {
-		t.Errorf("expected second path to be /etc/metadata/plugins, got %s", paths[1])
+	if paths[1] != "/etc/mimetype" {
+		t.Errorf("expected second path to be /etc/mimetype, got %s", paths[1])
 	}
 
-	if paths[2] != "/usr/lib/metadata/plugins" {
-		t.Errorf("expected third path to be /usr/lib/metadata/plugins, got %s", paths[2])
+	if paths[2] != "/usr/lib/mimetype" {
+		t.Errorf("expected third path to be /usr/lib/mimetype, got %s", paths[2])
 	}
 }
 
@@ -33,9 +33,9 @@ func TestFindPluginForCommand_Precedence(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create three levels of plugin directories
-	userDir := filepath.Join(tmpDir, "user", "metadata", "plugins", "text", "markdown")
-	adminDir := filepath.Join(tmpDir, "etc", "metadata", "plugins", "text", "markdown")
-	distroDir := filepath.Join(tmpDir, "lib", "metadata", "plugins", "text", "markdown")
+	userDir := filepath.Join(tmpDir, "user", "mimetype", "text", "markdown")
+	adminDir := filepath.Join(tmpDir, "etc", "mimetype", "text", "markdown")
+	distroDir := filepath.Join(tmpDir, "lib", "mimetype", "text", "markdown")
 
 	os.MkdirAll(userDir, 0755)
 	os.MkdirAll(adminDir, 0755)
@@ -51,9 +51,9 @@ func TestFindPluginForCommand_Precedence(t *testing.T) {
 	os.WriteFile(distroBin, []byte("#!/bin/sh\necho distro"), 0755)
 
 	// Create symlinks
-	os.Symlink(userBin, filepath.Join(userDir, "list"))
-	os.Symlink(adminBin, filepath.Join(adminDir, "list"))
-	os.Symlink(distroBin, filepath.Join(distroDir, "list"))
+	os.Symlink(userBin, filepath.Join(userDir, "metadata-list"))
+	os.Symlink(adminBin, filepath.Join(adminDir, "metadata-list"))
+	os.Symlink(distroBin, filepath.Join(distroDir, "metadata-list"))
 
 	// Save original env
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "user"))
@@ -62,15 +62,15 @@ func TestFindPluginForCommand_Precedence(t *testing.T) {
 
 	// Manually create test with overridden paths
 	paths := []string{
-		filepath.Join(tmpDir, "user", "metadata", "plugins"),
-		filepath.Join(tmpDir, "etc", "metadata", "plugins"),
-		filepath.Join(tmpDir, "lib", "metadata", "plugins"),
+		filepath.Join(tmpDir, "user", "mimetype"),
+		filepath.Join(tmpDir, "etc", "mimetype"),
+		filepath.Join(tmpDir, "lib", "mimetype"),
 	}
 
 	// Test user plugin is found
 	var foundPath string
 	for _, baseDir := range paths {
-		fullPath := filepath.Join(baseDir, "text", "markdown", "list")
+		fullPath := filepath.Join(baseDir, "text", "markdown", "metadata-list")
 		info, err := os.Lstat(fullPath)
 		if err == nil && info.Mode()&os.ModeSymlink != 0 {
 			target, _ := os.Readlink(fullPath)
@@ -88,10 +88,10 @@ func TestFindPluginForCommand_Precedence(t *testing.T) {
 	}
 
 	// Test: admin plugin when user plugin doesn't exist
-	os.Remove(filepath.Join(userDir, "list"))
+	os.Remove(filepath.Join(userDir, "metadata-list"))
 	foundPath = ""
 	for _, baseDir := range paths {
-		fullPath := filepath.Join(baseDir, "text", "markdown", "list")
+		fullPath := filepath.Join(baseDir, "text", "markdown", "metadata-list")
 		info, err := os.Lstat(fullPath)
 		if err == nil && info.Mode()&os.ModeSymlink != 0 {
 			target, _ := os.Readlink(fullPath)
@@ -122,7 +122,7 @@ func TestFindPluginForCommand_NoPlugin(t *testing.T) {
 		t.Error("expected error when plugin not found")
 	}
 
-	if err != nil && err.Error() != "no plugin found for mime type: nonexistent/mimetype (command: list)" {
+	if err != nil && err.Error() != "no plugin found for mime type: nonexistent/mimetype (command: metadata-list)" {
 		t.Errorf("expected ErrNoPluginFound, got %v", err)
 	}
 
@@ -134,13 +134,13 @@ func TestFindPluginForCommand_NoPlugin(t *testing.T) {
 func TestFindPluginForCommand_CommandSpecific(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "text", "markdown")
+	pluginDir := filepath.Join(tmpDir, "mimetype", "text", "markdown")
 	os.MkdirAll(pluginDir, 0755)
 
 	// Create only list command (no add or delete)
 	listBin := filepath.Join(tmpDir, "list-plugin")
 	os.WriteFile(listBin, []byte("#!/bin/sh\necho list"), 0755)
-	os.Symlink(listBin, filepath.Join(pluginDir, "list"))
+	os.Symlink(listBin, filepath.Join(pluginDir, "metadata-list"))
 
 	// Override env
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
@@ -150,7 +150,7 @@ func TestFindPluginForCommand_CommandSpecific(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected to find list plugin, got error: %v", err)
 	}
-	if pluginPath != filepath.Join(pluginDir, "list") {
+	if pluginPath != filepath.Join(pluginDir, "metadata-list") {
 		t.Errorf("expected plugin path %s, got %s", listBin, pluginPath)
 	}
 

@@ -24,19 +24,19 @@ func main() {
 	args := flagSet.Args()
 	var err error
 	switch command {
-	case "list":
+	case "metadata-list":
 		if len(args) != 1 {
 			usage()
 			os.Exit(1)
 		}
 		err = extractMetadata(args[0])
-	case "add":
+	case "metadata-add":
 		if len(args) < 3 {
 			usage()
 			os.Exit(1)
 		}
 		err = addMetadata(args[0], args[1], args[2])
-	case "delete":
+	case "metadata-delete":
 		if len(args) < 3 {
 			usage()
 			os.Exit(1)
@@ -55,11 +55,11 @@ func main() {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "Usage (run via a command-specific symlink):")
-	fmt.Fprintln(os.Stderr, "  list <file>")
-	fmt.Fprintln(os.Stderr, "  add <file> <key> <value>")
-	fmt.Fprintln(os.Stderr, "  delete <file> <key> <value>")
+	fmt.Fprintln(os.Stderr, "  metadata-list <file>")
+	fmt.Fprintln(os.Stderr, "  metadata-add <file> <key> <value>")
+	fmt.Fprintln(os.Stderr, "  metadata-delete <file> <key> <value>")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "Available commands are invoked by creating symlinks named list/add/delete pointing to this binary.")
+	fmt.Fprintln(os.Stderr, "Available commands are invoked by creating symlinks named metadata-list/metadata-add/metadata-delete pointing to this binary.")
 }
 
 func extractMetadata(filePath string) error {
