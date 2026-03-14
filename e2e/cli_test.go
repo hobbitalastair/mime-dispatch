@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -13,30 +14,121 @@ var cliModule = "../cmd/metadata"
 var pluginModule = "../plugins/markdown"
 var audioPluginModule = "../plugins/audio"
 
+var (
+	cliBinary     string
+	cliBuildOnce  sync.Once
+	cliBuildError error
+
+	markdownPluginBinary     string
+	markdownPluginBuildOnce  sync.Once
+	markdownPluginBuildError error
+
+	audioPluginBinary     string
+	audioPluginBuildOnce  sync.Once
+	audioPluginBuildError error
+
+	imagePluginBinary     string
+	imagePluginBuildOnce  sync.Once
+	imagePluginBuildError error
+)
+
+func buildCLI(t *testing.T) string {
+	cliBuildOnce.Do(func() {
+		// Build to a temp location that persists across all tests
+		tmpDir := os.TempDir()
+		cliBinary = filepath.Join(tmpDir, "metadata-test-cli")
+
+		cmd := exec.Command("go", "build", "-o", cliBinary, cliModule)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			cliBuildError = err
+			t.Logf("failed to build CLI: %v, output: %s", err, output)
+		}
+	})
+
+	if cliBuildError != nil {
+		t.Fatalf("CLI build failed: %v", cliBuildError)
+	}
+
+	return cliBinary
+}
+
 func runCLI(t *testing.T, args ...string) (string, error) {
-	cmd := exec.Command("go", append([]string{"run", cliModule}, args...)...)
+	binary := buildCLI(t)
+	cmd := exec.Command(binary, args...)
 	output, err := cmd.CombinedOutput()
 	return string(output), err
+}
+
+func buildMarkdownPlugin(t *testing.T) string {
+	markdownPluginBuildOnce.Do(func() {
+		tmpDir := os.TempDir()
+		markdownPluginBinary = filepath.Join(tmpDir, "metadata-markdown-plugin")
+
+		cmd := exec.Command("go", "build", "-o", markdownPluginBinary, pluginModule)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			markdownPluginBuildError = err
+			t.Logf("failed to build markdown plugin: %v, output: %s", err, output)
+		}
+	})
+
+	if markdownPluginBuildError != nil {
+		t.Fatalf("markdown plugin build failed: %v", markdownPluginBuildError)
+	}
+
+	return markdownPluginBinary
+}
+
+func buildAudioPlugin(t *testing.T) string {
+	audioPluginBuildOnce.Do(func() {
+		tmpDir := os.TempDir()
+		audioPluginBinary = filepath.Join(tmpDir, "metadata-audio-plugin")
+
+		cmd := exec.Command("go", "build", "-o", audioPluginBinary, ".")
+		cmd.Dir = audioPluginModule
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			audioPluginBuildError = err
+			t.Logf("failed to build audio plugin: %v, output: %s", err, output)
+		}
+	})
+
+	if audioPluginBuildError != nil {
+		t.Fatalf("audio plugin build failed: %v", audioPluginBuildError)
+	}
+
+	return audioPluginBinary
+}
+
+func buildImagePlugin(t *testing.T) string {
+	imagePluginBuildOnce.Do(func() {
+		tmpDir := os.TempDir()
+		imagePluginBinary = filepath.Join(tmpDir, "metadata-image-plugin")
+
+		cmd := exec.Command("go", "build", "-o", imagePluginBinary, ".")
+		cmd.Dir = "../plugins/image"
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			imagePluginBuildError = err
+			t.Logf("failed to build image plugin: %v, output: %s", err, output)
+		}
+	})
+
+	if imagePluginBuildError != nil {
+		t.Fatalf("image plugin build failed: %v", imagePluginBuildError)
+	}
+
+	return imagePluginBinary
 }
 
 func setupPlugin(t *testing.T) func() {
 	tmpDir := t.TempDir()
 
-	pluginBuildDir := filepath.Join(tmpDir, "build")
-	err := os.MkdirAll(pluginBuildDir, 0755)
-	if err != nil {
-		t.Fatalf("failed to create plugin build dir: %v", err)
-	}
-
-	pluginBinary := filepath.Join(pluginBuildDir, "metadata-plugin")
-	cmd := exec.Command("go", "build", "-o", pluginBinary, pluginModule)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("failed to build plugin: %v, output: %s", err, output)
-	}
+	pluginBinary := buildMarkdownPlugin(t)
 
 	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "text", "markdown")
-	err = os.MkdirAll(pluginDir, 0755)
+	err := os.MkdirAll(pluginDir, 0755)
 	if err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
@@ -801,22 +893,11 @@ title: File Title
 func setupAudioPlugin(t *testing.T) func() {
 	tmpDir := t.TempDir()
 
-	pluginBuildDir := filepath.Join(tmpDir, "build")
-	err := os.MkdirAll(pluginBuildDir, 0755)
-	if err != nil {
-		t.Fatalf("failed to create plugin build dir: %v", err)
-	}
-
-	pluginBinary := filepath.Join(pluginBuildDir, "metadata-plugin")
-	cmd := exec.Command("go", "-C", "../plugins/audio", "build", "-o", pluginBinary, ".")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("failed to build audio plugin: %v, output: %s", err, output)
-	}
+	pluginBinary := buildAudioPlugin(t)
 
 	for _, mimeType := range []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg"} {
 		pluginParentDir := filepath.Join(tmpDir, "metadata", "plugins", mimeType)
-		err = os.MkdirAll(pluginParentDir, 0755)
+		err := os.MkdirAll(pluginParentDir, 0755)
 		if err != nil {
 			t.Fatalf("failed to create plugin parent dir: %v", err)
 		}
@@ -967,21 +1048,10 @@ func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
 func setupImagePlugin(t *testing.T) func() {
 	tmpDir := t.TempDir()
 
-	pluginBuildDir := filepath.Join(tmpDir, "build")
-	err := os.MkdirAll(pluginBuildDir, 0755)
-	if err != nil {
-		t.Fatalf("failed to create plugin build dir: %v", err)
-	}
-
-	pluginBinary := filepath.Join(pluginBuildDir, "metadata-image-plugin")
-	cmd := exec.Command("go", "-C", "../plugins/image", "build", "-o", pluginBinary, ".")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("failed to build image plugin: %v, output: %s", err, output)
-	}
+	pluginBinary := buildImagePlugin(t)
 
 	pluginDir := filepath.Join(tmpDir, "metadata", "plugins", "image", "jpeg")
-	err = os.MkdirAll(pluginDir, 0755)
+	err := os.MkdirAll(pluginDir, 0755)
 	if err != nil {
 		t.Fatalf("failed to create image plugin dir: %v", err)
 	}
