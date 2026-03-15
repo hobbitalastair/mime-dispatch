@@ -1,11 +1,14 @@
 package pluginio
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+var ErrNonScalarValue = errors.New("metadata values must be strings or sequences of strings")
 
 func SerializeMetadata(metadata map[string][]string) (string, error) {
 	if len(metadata) == 0 {
@@ -51,9 +54,14 @@ func DeserializeMetadata(input string) (map[string][]string, error) {
 		}
 
 		switch parsed := value.(type) {
+		case map[string]interface{}:
+			return nil, fmt.Errorf("key %q: %w", key, ErrNonScalarValue)
 		case []interface{}:
 			values := make([]string, len(parsed))
 			for i, item := range parsed {
+				if _, ok := item.(map[string]interface{}); ok {
+					return nil, fmt.Errorf("key %q[%d]: %w", key, i, ErrNonScalarValue)
+				}
 				values[i] = fmt.Sprintf("%v", item)
 			}
 			result[key] = values

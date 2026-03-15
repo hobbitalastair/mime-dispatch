@@ -7,6 +7,17 @@ import (
 	"testing"
 )
 
+func setPluginSearchPathsForTest(t *testing.T, paths []string) {
+	t.Helper()
+	original := pluginSearchPathsFn
+	pluginSearchPathsFn = func() []string {
+		return paths
+	}
+	t.Cleanup(func() {
+		pluginSearchPathsFn = original
+	})
+}
+
 func TestPluginSearchPaths(t *testing.T) {
 	// Test with XDG_CONFIG_HOME set
 	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
@@ -37,74 +48,68 @@ func TestFindPluginForCommand_Precedence(t *testing.T) {
 	adminDir := filepath.Join(tmpDir, "etc", "mimetype", "text", "markdown")
 	distroDir := filepath.Join(tmpDir, "lib", "mimetype", "text", "markdown")
 
-	os.MkdirAll(userDir, 0755)
-	os.MkdirAll(adminDir, 0755)
-	os.MkdirAll(distroDir, 0755)
+	if err := os.MkdirAll(userDir, 0755); err != nil {
+		t.Fatalf("mkdir user dir: %v", err)
+	}
+	if err := os.MkdirAll(adminDir, 0755); err != nil {
+		t.Fatalf("mkdir admin dir: %v", err)
+	}
+	if err := os.MkdirAll(distroDir, 0755); err != nil {
+		t.Fatalf("mkdir distro dir: %v", err)
+	}
 
 	// Create dummy binaries
 	userBin := filepath.Join(tmpDir, "user-plugin")
 	adminBin := filepath.Join(tmpDir, "admin-plugin")
 	distroBin := filepath.Join(tmpDir, "distro-plugin")
 
-	os.WriteFile(userBin, []byte("#!/bin/sh\necho user"), 0755)
-	os.WriteFile(adminBin, []byte("#!/bin/sh\necho admin"), 0755)
-	os.WriteFile(distroBin, []byte("#!/bin/sh\necho distro"), 0755)
+	if err := os.WriteFile(userBin, []byte("#!/bin/sh\necho user"), 0755); err != nil {
+		t.Fatalf("write user binary: %v", err)
+	}
+	if err := os.WriteFile(adminBin, []byte("#!/bin/sh\necho admin"), 0755); err != nil {
+		t.Fatalf("write admin binary: %v", err)
+	}
+	if err := os.WriteFile(distroBin, []byte("#!/bin/sh\necho distro"), 0755); err != nil {
+		t.Fatalf("write distro binary: %v", err)
+	}
 
 	// Create symlinks
-	os.Symlink(userBin, filepath.Join(userDir, "metadata-list"))
-	os.Symlink(adminBin, filepath.Join(adminDir, "metadata-list"))
-	os.Symlink(distroBin, filepath.Join(distroDir, "metadata-list"))
+	if err := os.Symlink(userBin, filepath.Join(userDir, "metadata-list")); err != nil {
+		t.Fatalf("symlink user plugin: %v", err)
+	}
+	if err := os.Symlink(adminBin, filepath.Join(adminDir, "metadata-list")); err != nil {
+		t.Fatalf("symlink admin plugin: %v", err)
+	}
+	if err := os.Symlink(distroBin, filepath.Join(distroDir, "metadata-list")); err != nil {
+		t.Fatalf("symlink distro plugin: %v", err)
+	}
 
-	// Save original env
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "user"))
-
-	// Test: user plugin takes precedence
-
-	// Manually create test with overridden paths
 	paths := []string{
 		filepath.Join(tmpDir, "user", "mimetype"),
 		filepath.Join(tmpDir, "etc", "mimetype"),
 		filepath.Join(tmpDir, "lib", "mimetype"),
 	}
+	setPluginSearchPathsForTest(t, paths)
 
-	// Test user plugin is found
-	var foundPath string
-	for _, baseDir := range paths {
-		fullPath := filepath.Join(baseDir, "text", "markdown", "metadata-list")
-		info, err := os.Lstat(fullPath)
-		if err == nil && info.Mode()&os.ModeSymlink != 0 {
-			target, _ := os.Readlink(fullPath)
-			if filepath.IsAbs(target) {
-				foundPath = target
-			} else {
-				foundPath, _ = filepath.Abs(filepath.Join(fullPath, target))
-			}
-			break
-		}
+	foundPath, err := FindPluginForCommand("text/markdown", PluginList)
+	if err != nil {
+		t.Fatalf("find list plugin: %v", err)
 	}
-
-	if foundPath != userBin {
-		t.Errorf("expected user plugin to take precedence, got %s", foundPath)
+	if foundPath != filepath.Join(userDir, "metadata-list") {
+		t.Errorf("expected user plugin path, got %s", foundPath)
 	}
 
 	// Test: admin plugin when user plugin doesn't exist
-	os.Remove(filepath.Join(userDir, "metadata-list"))
-	foundPath = ""
-	for _, baseDir := range paths {
-		fullPath := filepath.Join(baseDir, "text", "markdown", "metadata-list")
-		info, err := os.Lstat(fullPath)
-		if err == nil && info.Mode()&os.ModeSymlink != 0 {
-			target, _ := os.Readlink(fullPath)
-			if filepath.IsAbs(target) {
-				foundPath = target
-			} else {
-				foundPath, _ = filepath.Abs(filepath.Join(fullPath, target))
-			}
-			break
-		}
+	if err := os.Remove(filepath.Join(userDir, "metadata-list")); err != nil {
+		t.Fatalf("remove user plugin symlink: %v", err)
 	}
 
-	if foundPath != adminBin {
+	foundPath, err = FindPluginForCommand("text/markdown", PluginList)
+	if err != nil {
+		t.Fatalf("find admin plugin: %v", err)
+	}
+
+	if foundPath != filepath.Join(adminDir, "metadata-list") {
 		t.Errorf("expected admin plugin when user missing, got %s", foundPath)
 	}
 }
@@ -114,6 +119,7 @@ func TestFindPluginForCommand_NoPlugin(t *testing.T) {
 
 	// Override env to use temp directory
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	setPluginSearchPathsForTest(t, []string{filepath.Join(tmpDir, "mimetype")})
 
 	_, err := FindPluginForCommand("nonexistent/mimetype", PluginList)
 
@@ -135,15 +141,20 @@ func TestFindPluginForCommand_CommandSpecific(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	pluginDir := filepath.Join(tmpDir, "mimetype", "text", "markdown")
-	os.MkdirAll(pluginDir, 0755)
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatalf("mkdir plugin dir: %v", err)
+	}
 
 	// Create only list command (no add or delete)
 	listBin := filepath.Join(tmpDir, "list-plugin")
-	os.WriteFile(listBin, []byte("#!/bin/sh\necho list"), 0755)
-	os.Symlink(listBin, filepath.Join(pluginDir, "metadata-list"))
+	if err := os.WriteFile(listBin, []byte("#!/bin/sh\necho list"), 0755); err != nil {
+		t.Fatalf("write list binary: %v", err)
+	}
+	if err := os.Symlink(listBin, filepath.Join(pluginDir, "metadata-list")); err != nil {
+		t.Fatalf("symlink list plugin: %v", err)
+	}
 
-	// Override env
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	setPluginSearchPathsForTest(t, []string{filepath.Join(tmpDir, "mimetype")})
 
 	// list should be found
 	pluginPath, err := FindPluginForCommand("text/markdown", PluginList)

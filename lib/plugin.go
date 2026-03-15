@@ -1,7 +1,7 @@
 package lib
 
 import (
-	"io"
+	"bytes"
 	"metadata/pkg/pluginio"
 	"os"
 	"os/exec"
@@ -51,13 +51,15 @@ type ErrNoPluginFound struct {
 	Command  PluginCommand
 }
 
+var pluginSearchPathsFn = PluginSearchPaths
+
 func (e ErrNoPluginFound) Error() string {
 	return "no plugin found for mime type: " + e.MimeType + " (command: " + e.Command.String() + ")"
 }
 
 func FindPluginForCommand(mimeType string, command PluginCommand) (string, error) {
 	pluginPath := filepath.Join(mimeType, command.String())
-	for _, baseDir := range PluginSearchPaths() {
+	for _, baseDir := range pluginSearchPathsFn() {
 		fullPath := filepath.Join(baseDir, pluginPath)
 		info, err := os.Lstat(fullPath)
 		if err == nil {
@@ -69,7 +71,7 @@ func FindPluginForCommand(mimeType string, command PluginCommand) (string, error
 
 	if command == PluginList {
 		genericPath := mimeType
-		for _, baseDir := range PluginSearchPaths() {
+		for _, baseDir := range pluginSearchPathsFn() {
 			fullPath := filepath.Join(baseDir, genericPath)
 			info, err := os.Lstat(fullPath)
 			if err != nil {
@@ -95,37 +97,19 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 	}
 
 	cmd := exec.Command(pluginPath, args...)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-	stdout, err := cmd.StdoutPipe()
+	err := cmd.Run()
 	if err != nil {
-		return nil, err
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-
-	output, err := io.ReadAll(stdout)
-	if err != nil {
-		cmd.Wait()
-		return nil, err
-	}
-
-	errBytes, _ := io.ReadAll(stderr)
-	cmd.Wait()
-
-	if cmd.ProcessState.ExitCode() != 0 {
 		return nil, PluginError{
-			Stderr: string(errBytes),
+			Stderr: stderr.String(),
 		}
 	}
 
-	return ParsePluginOutput(string(output))
+	return ParsePluginOutput(stdout.String())
 }
 
 type PluginError struct {

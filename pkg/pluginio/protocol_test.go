@@ -1,6 +1,7 @@
 package pluginio
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -83,11 +84,25 @@ func TestDeserializeMetadata(t *testing.T) {
 			input:    "tags:\n",
 			expected: map[string][]string{"tags": {}},
 		},
+		{
+			name:  "reject nested map",
+			input: "obj:\n  a: b\n",
+		},
+		{
+			name:  "reject nested map in sequence",
+			input: "list:\n  - a\n  - k: v\n",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actual, err := DeserializeMetadata(tt.input)
+			if tt.expected == nil {
+				if !errors.Is(err, ErrNonScalarValue) {
+					t.Fatalf("expected ErrNonScalarValue, got %v", err)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("DeserializeMetadata error: %v", err)
 			}
