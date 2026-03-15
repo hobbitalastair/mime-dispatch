@@ -5,6 +5,7 @@ import (
 	"metadata/pkg/pluginio"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/evanoberholster/imagemeta"
 	"github.com/spf13/pflag"
@@ -61,7 +62,7 @@ func listMetadata(filePath string) error {
 		date = exif.CreateDate()
 	}
 	if !date.IsZero() {
-		metadata["date"] = []string{date.Format("2006:01:02 15:04:05")}
+		metadata["datetime"] = []string{formatISO8601DateTime(date)}
 	}
 
 	lat := exif.GPS.Latitude()
@@ -71,7 +72,7 @@ func listMetadata(filePath string) error {
 	}
 
 	if exif.ImageDescription != "" {
-		metadata["caption"] = []string{exif.ImageDescription}
+		metadata["comment"] = []string{exif.ImageDescription}
 	}
 
 	if len(metadata) > 0 {
@@ -83,4 +84,12 @@ func listMetadata(filePath string) error {
 	}
 
 	return nil
+}
+
+func formatISO8601DateTime(t time.Time) string {
+	_, offset := t.Zone()
+	if offset != 0 {
+		return t.Format("2006-01-02T15:04:05-07:00")
+	}
+	return t.Format("2006-01-02T15:04:05")
 }

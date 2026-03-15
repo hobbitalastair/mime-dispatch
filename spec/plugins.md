@@ -10,6 +10,8 @@ The supported helpers are:
 
 Output is YAML-like, same as the main executable.
 
+For standardized metadata keys and value formats used across plugins, see `spec/tags.md`.
+
 These directories are searched in the following order (first match wins):
 
 1. `$XDG_CONFIG_HOME/mimetype/<mime-type>/` (user)
@@ -25,4 +27,3 @@ For example, the `audio/mpeg` mime type may be supported by binaries or symlinks
 ```
 
 If a `metadata-list` binary is placed into `$XDG_CONFIG_HOME/mimetype/audio/mpeg/` it will be used in preference to the system one in `/usr/lib/mimetype`.
-

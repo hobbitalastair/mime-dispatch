@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -1021,11 +1022,27 @@ func TestImagePluginListMetadata(t *testing.T) {
 		t.Fatalf("list failed: %v, output: %s", err, output)
 	}
 
-	if !strings.Contains(output, "date:") {
-		t.Errorf("expected date in output, got: %s", output)
+	metadata := parseMetadataOutput(t, output)
+
+	datetimeValues, ok := metadata["datetime"]
+	if !ok || len(datetimeValues) != 1 {
+		t.Fatalf("expected single datetime value in output, got: %v", metadata["datetime"])
 	}
 
-	if !strings.Contains(output, "location:") {
+	isoDateTimePattern := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2})?$`)
+	if !isoDateTimePattern.MatchString(datetimeValues[0]) {
+		t.Errorf("expected ISO 8601 datetime, got: %q", datetimeValues[0])
+	}
+
+	if _, datePresent := metadata["date"]; datePresent {
+		t.Errorf("did not expect date field, got output: %s", output)
+	}
+
+	if _, captionPresent := metadata["caption"]; captionPresent {
+		t.Errorf("did not expect caption field, got output: %s", output)
+	}
+
+	if _, hasLocation := metadata["location"]; !hasLocation {
 		t.Errorf("expected location in output, got: %s", output)
 	}
 }

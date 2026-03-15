@@ -43,3 +43,5 @@ another_key: another_value
 ```
 
 YAML formatting details (quoting style, scalar style, and indentation) are produced by the YAML serializer and may vary; consumers should parse YAML rather than rely on exact whitespace.
+
+For standardized metadata keys and value formats, see `spec/tags.md`.
