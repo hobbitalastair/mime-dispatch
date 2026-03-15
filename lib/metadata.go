@@ -15,21 +15,6 @@ type Options struct {
 
 type Metadata map[string][]string
 
-func (m Metadata) ToYAML() string {
-	result := ""
-	for k, values := range m {
-		if len(values) == 1 {
-			result += k + ": " + values[0] + "\n"
-		} else {
-			result += k + ":\n"
-			for _, v := range values {
-				result += "  - " + v + "\n"
-			}
-		}
-	}
-	return result
-}
-
 func MergeMetadata(fileMeta, xattrMeta map[string][]string) map[string][]string {
 	seen := make(map[string]map[string]struct{})
 	addMetadata := func(key string, values []string) {

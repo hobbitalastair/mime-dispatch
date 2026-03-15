@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"metadata/pkg/pluginio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,16 +97,26 @@ func extractMetadata(filePath string) error {
 		return err
 	}
 
+	result := make(map[string][]string)
 	for k, v := range metadata {
 		switch val := v.(type) {
 		case []interface{}:
-			fmt.Printf("%s:\n", k)
+			values := make([]string, 0, len(val))
 			for _, item := range val {
-				fmt.Printf("  - %s\n", formatValue(item))
+				values = append(values, formatValue(item))
 			}
+			result[k] = values
 		default:
-			fmt.Printf("%s: %s\n", k, formatValue(val))
+			result[k] = []string{formatValue(val)}
 		}
+	}
+
+	if len(result) > 0 {
+		output, err := pluginio.SerializeMetadata(result)
+		if err != nil {
+			return err
+		}
+		fmt.Print(output)
 	}
 
 	return nil

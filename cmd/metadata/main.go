@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"metadata/pkg/pluginio"
 	"os"
 
 	"metadata/lib"
@@ -51,7 +52,12 @@ func main() {
 		if e != nil {
 			err = e
 		} else {
-			fmt.Print(metadata.ToYAML())
+			output, serializeErr := pluginio.SerializeMetadata(metadata)
+			if serializeErr != nil {
+				err = serializeErr
+			} else {
+				fmt.Print(output)
+			}
 		}
 	case "add", "delete":
 		if len(remainingArgs) < 2 {

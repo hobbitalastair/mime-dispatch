@@ -37,7 +37,9 @@ All commands output flat YAML. Keys with multiple values use YAML sequences:
 ```
 key: value
 multi-valued:
-  - value1
-  - value2
+    - value1
+    - value2
 another_key: another_value
 ```
+
+YAML formatting details (quoting style, scalar style, and indentation) are produced by the YAML serializer and may vary; consumers should parse YAML rather than rely on exact whitespace.

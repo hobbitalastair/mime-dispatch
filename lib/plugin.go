@@ -2,11 +2,11 @@ package lib
 
 import (
 	"io"
+	"metadata/pkg/pluginio"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strings"
 )
 
 type PluginCommand int
@@ -67,16 +67,18 @@ func FindPluginForCommand(mimeType string, command PluginCommand) (string, error
 		}
 	}
 
-	genericPath := mimeType
-	for _, baseDir := range PluginSearchPaths() {
-		fullPath := filepath.Join(baseDir, genericPath)
-		info, err := os.Lstat(fullPath)
-		if err != nil {
-			continue
-		}
+	if command == PluginList {
+		genericPath := mimeType
+		for _, baseDir := range PluginSearchPaths() {
+			fullPath := filepath.Join(baseDir, genericPath)
+			info, err := os.Lstat(fullPath)
+			if err != nil {
+				continue
+			}
 
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fullPath, nil
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fullPath, nil
+			}
 		}
 	}
 
@@ -123,7 +125,7 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 		}
 	}
 
-	return ParsePluginOutput(string(output)), nil
+	return ParsePluginOutput(string(output))
 }
 
 type PluginError struct {
@@ -134,37 +136,6 @@ func (e PluginError) Error() string {
 	return e.Stderr
 }
 
-func ParsePluginOutput(output string) map[string][]string {
-	result := make(map[string][]string)
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-
-	var currentKey string
-	for _, line := range lines {
-		if strings.HasPrefix(line, "  - ") {
-			value := strings.TrimPrefix(line, "  - ")
-			if currentKey != "" {
-				result[currentKey] = append(result[currentKey], value)
-			}
-			continue
-		}
-
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) == 2 {
-			key := parts[0]
-			value := strings.TrimSpace(parts[1])
-			currentKey = key
-			if value != "" {
-				result[key] = append(result[key], value)
-			} else {
-				result[key] = []string{}
-			}
-		}
-	}
-
-	return result
+func ParsePluginOutput(output string) (map[string][]string, error) {
+	return pluginio.DeserializeMetadata(output)
 }

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"metadata/pkg/pluginio"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -112,6 +113,17 @@ func runCLI(t *testing.T, args ...string) (string, error) {
 	cmd := exec.Command(cliBinary, args...)
 	output, err := cmd.CombinedOutput()
 	return string(output), err
+}
+
+func parseMetadataOutput(t *testing.T, output string) map[string][]string {
+	t.Helper()
+
+	metadata, err := pluginio.DeserializeMetadata(output)
+	if err != nil {
+		t.Fatalf("failed to parse metadata output %q: %v", output, err)
+	}
+
+	return metadata
 }
 
 func TestCLIMissingArgs(t *testing.T) {
@@ -292,6 +304,76 @@ author: File Author
 	}
 	if strings.Contains(string(fileContent), "xattr-key") {
 		t.Errorf("expected xattr not to be in file content when using --xattr-only, got: %s", fileContent)
+	}
+}
+
+func TestXattrOnlyPreservesUnusualCharacters(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "xattr-special.txt")
+	err := os.WriteFile(testFile, []byte("hello\n"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	key := "xattr_special"
+	value := "line1\nline2: \"quoted\",comma, and trailing space "
+
+	_, err = runCLI(t, "add", "--xattr-only", testFile, key, value)
+	if err != nil {
+		t.Fatalf("add --xattr-only failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--xattr-only", testFile)
+	if err != nil {
+		t.Fatalf("list --xattr-only failed: %v, output: %s", err, output)
+	}
+
+	metadata := parseMetadataOutput(t, output)
+	values, ok := metadata[key]
+	if !ok {
+		t.Fatalf("expected key %q in output, got: %s", key, output)
+	}
+	if len(values) != 1 {
+		t.Fatalf("expected one value for %q, got %v", key, values)
+	}
+	if values[0] != value {
+		t.Fatalf("xattr value mismatch: got %q, expected %q", values[0], value)
+	}
+}
+
+func TestPluginPreservesUnusualCharacters(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	testFile := filepath.Join(tmpDir, "plugin-special.md")
+	err := os.WriteFile(testFile, []byte("# Hello\n"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	key := "plugin:key with spaces"
+	value := "line1\nline2: \"quoted\" and #hash"
+
+	_, err = runCLI(t, "add", "--file-only", testFile, key, value)
+	if err != nil {
+		t.Fatalf("add --file-only failed: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list --file-only failed: %v, output: %s", err, output)
+	}
+
+	metadata := parseMetadataOutput(t, output)
+	values, ok := metadata[key]
+	if !ok {
+		t.Fatalf("expected key %q in output, got: %s", key, output)
+	}
+	if len(values) != 1 {
+		t.Fatalf("expected one value for %q, got %v", key, values)
+	}
+	if values[0] != value {
+		t.Fatalf("plugin value mismatch: got %q, expected %q", values[0], value)
 	}
 }
 

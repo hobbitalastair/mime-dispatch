@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"metadata/pkg/pluginio"
 	"os"
 	"path/filepath"
 
@@ -50,29 +51,39 @@ func listMetadata(filePath string) error {
 		return err
 	}
 
+	result := make(map[string][]string)
+
 	if title := metadata.Title(); title != "" {
-		fmt.Printf("title: %s\n", title)
+		result["title"] = []string{title}
 	}
 	if album := metadata.Album(); album != "" {
-		fmt.Printf("album: %s\n", album)
+		result["album"] = []string{album}
 	}
 	if artist := metadata.Artist(); artist != "" {
-		fmt.Printf("artist: %s\n", artist)
+		result["artist"] = []string{artist}
 	}
 	if albumArtist := metadata.AlbumArtist(); albumArtist != "" {
-		fmt.Printf("album_artist: %s\n", albumArtist)
+		result["album_artist"] = []string{albumArtist}
 	}
 	if composer := metadata.Composer(); composer != "" {
-		fmt.Printf("composer: %s\n", composer)
+		result["composer"] = []string{composer}
 	}
 	if genre := metadata.Genre(); genre != "" {
-		fmt.Printf("genre: %s\n", genre)
+		result["genre"] = []string{genre}
 	}
 	if year := metadata.Year(); year != 0 {
-		fmt.Printf("year: %d\n", year)
+		result["year"] = []string{fmt.Sprintf("%d", year)}
 	}
 	if comment := metadata.Comment(); comment != "" {
-		fmt.Printf("comment: %s\n", comment)
+		result["comment"] = []string{comment}
+	}
+
+	if len(result) > 0 {
+		output, err := pluginio.SerializeMetadata(result)
+		if err != nil {
+			return err
+		}
+		fmt.Print(output)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"metadata/pkg/pluginio"
 	"os"
 	"path/filepath"
 
@@ -50,7 +51,8 @@ func listMetadata(filePath string) error {
 		return err
 	}
 
-	// Extract date from EXIF - try DateTimeOriginal first, then ModifyDate, then CreateDate
+	metadata := make(map[string][]string)
+
 	date := exif.DateTimeOriginal()
 	if date.IsZero() {
 		date = exif.ModifyDate()
@@ -59,19 +61,25 @@ func listMetadata(filePath string) error {
 		date = exif.CreateDate()
 	}
 	if !date.IsZero() {
-		fmt.Printf("date: %s\n", date.Format("2006:01:02 15:04:05"))
+		metadata["date"] = []string{date.Format("2006:01:02 15:04:05")}
 	}
 
-	// Extract location from EXIF GPS
 	lat := exif.GPS.Latitude()
 	lon := exif.GPS.Longitude()
 	if lat != 0 || lon != 0 {
-		fmt.Printf("location: %v,%v\n", lat, lon)
+		metadata["location"] = []string{fmt.Sprintf("%v,%v", lat, lon)}
 	}
 
-	// Extract caption from EXIF ImageDescription
 	if exif.ImageDescription != "" {
-		fmt.Printf("caption: %s\n", exif.ImageDescription)
+		metadata["caption"] = []string{exif.ImageDescription}
+	}
+
+	if len(metadata) > 0 {
+		data, err := pluginio.SerializeMetadata(metadata)
+		if err != nil {
+			return err
+		}
+		fmt.Print(data)
 	}
 
 	return nil
