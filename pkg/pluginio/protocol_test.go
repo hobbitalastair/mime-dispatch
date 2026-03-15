@@ -3,6 +3,7 @@ package pluginio
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -49,7 +50,28 @@ func TestSerializeMetadata(t *testing.T) {
 			if !reflect.DeepEqual(roundtrip, tt.expected) {
 				t.Fatalf("roundtrip mismatch: got %#v, expected %#v", roundtrip, tt.expected)
 			}
+
+			if serialized != "" && !strings.HasSuffix(serialized, "\n") {
+				t.Fatalf("expected serialized metadata to end with newline, got %q", serialized)
+			}
 		})
+	}
+}
+
+func TestSerializeMetadataSortsKeysAndValues(t *testing.T) {
+	metadata := map[string][]string{
+		"zeta":  {"2", "10", "1"},
+		"alpha": {"b", "a"},
+	}
+
+	serialized, err := SerializeMetadata(metadata)
+	if err != nil {
+		t.Fatalf("SerializeMetadata error: %v", err)
+	}
+
+	expected := "alpha:\n    - a\n    - b\nzeta:\n    - \"1\"\n    - \"10\"\n    - \"2\"\n"
+	if serialized != expected {
+		t.Fatalf("unexpected serialization order:\n got: %q\nwant: %q", serialized, expected)
 	}
 }
 
