@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
+	"metadata/pkg/plugincli"
 	"metadata/pkg/pluginio"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,46 +29,33 @@ func formatValue(v interface{}) string {
 }
 
 func main() {
-	command := filepath.Base(os.Args[0])
-
-	flagSet := pflag.NewFlagSet(command, pflag.ContinueOnError)
-	flagSet.Usage = usage
-	if err := flagSet.Parse(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		usage()
-		os.Exit(1)
+	caps := plugincli.Capabilities{
+		Mimetypes: []string{"text/markdown", "text/plain"},
+		Commands: map[string]func() error{
+			"metadata-list": func() error {
+				args := plugincli.ParseArgs("metadata-list", usage)
+				if len(args) != 1 {
+					return plugincli.ErrUsage
+				}
+				return extractMetadata(args[0])
+			},
+			"metadata-add": func() error {
+				args := plugincli.ParseArgs("metadata-add", usage)
+				if len(args) < 3 {
+					return plugincli.ErrUsage
+				}
+				return addMetadata(args[0], args[1], args[2])
+			},
+			"metadata-delete": func() error {
+				args := plugincli.ParseArgs("metadata-delete", usage)
+				if len(args) < 3 {
+					return plugincli.ErrUsage
+				}
+				return deleteMetadata(args[0], args[1], args[2])
+			},
+		},
 	}
-
-	args := flagSet.Args()
-	var err error
-	switch command {
-	case "metadata-list":
-		if len(args) != 1 {
-			usage()
-			os.Exit(1)
-		}
-		err = extractMetadata(args[0])
-	case "metadata-add":
-		if len(args) < 3 {
-			usage()
-			os.Exit(1)
-		}
-		err = addMetadata(args[0], args[1], args[2])
-	case "metadata-delete":
-		if len(args) < 3 {
-			usage()
-			os.Exit(1)
-		}
-		err = deleteMetadata(args[0], args[1], args[2])
-	default:
-		usage()
-		os.Exit(1)
-	}
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	plugincli.Run(caps, usage)
 }
 
 func usage() {

@@ -2,36 +2,28 @@ package main
 
 import (
 	"fmt"
+	"metadata/pkg/plugincli"
 	"metadata/pkg/pluginio"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/evanoberholster/imagemeta"
-	"github.com/spf13/pflag"
 )
 
 func main() {
-	command := filepath.Base(os.Args[0])
-
-	flagSet := pflag.NewFlagSet(command, pflag.ContinueOnError)
-	flagSet.Usage = usage
-	if err := flagSet.Parse(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		usage()
-		os.Exit(1)
+	caps := plugincli.Capabilities{
+		Mimetypes: []string{"image/jpeg"},
+		Commands: map[string]func() error{
+			"metadata-list": func() error {
+				args := plugincli.ParseArgs("metadata-list", usage)
+				if len(args) != 1 {
+					return plugincli.ErrUsage
+				}
+				return listMetadata(args[0])
+			},
+		},
 	}
-
-	args := flagSet.Args()
-	if command != "metadata-list" || len(args) != 1 {
-		usage()
-		os.Exit(1)
-	}
-
-	if err := listMetadata(args[0]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	plugincli.Run(caps, usage)
 }
 
 func usage() {

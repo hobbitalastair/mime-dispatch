@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"metadata/pkg/pluginio"
 	"os"
@@ -53,6 +54,7 @@ func buildAll() error {
 		dir  string
 	}{
 		{"cli", "../cmd/metadata"},
+		{"mimetype-install", "../cmd/mimetype-install"},
 		{"yaml-frontmatter", "../plugins/yaml-frontmatter"},
 		{"audio", "../plugins/audio"},
 		{"image", "../plugins/image"},
@@ -84,27 +86,13 @@ func buildAll() error {
 }
 
 func installPlugins() error {
-	plugins := map[string]struct {
-		binary   string
-		commands []string
-	}{
-		"text/markdown":      {"yaml-frontmatter", []string{"metadata-list", "metadata-add", "metadata-delete"}},
-		"text/plain":         {"yaml-frontmatter", []string{"metadata-list", "metadata-add", "metadata-delete"}},
-		"audio/mpeg":         {"audio", []string{"metadata-list"}},
-		"audio/ogg":          {"audio", []string{"metadata-list"}},
-		"audio/x-vorbis+ogg": {"audio", []string{"metadata-list"}},
-		"image/jpeg":         {"image", []string{"metadata-list"}},
-	}
-	for mimeType, p := range plugins {
-		dir := filepath.Join(testDir, "mimetype", mimeType)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return err
-		}
-		binary := filepath.Join(testDir, p.binary)
-		for _, cmd := range p.commands {
-			if err := os.Symlink(binary, filepath.Join(dir, cmd)); err != nil {
-				return err
-			}
+	installer := filepath.Join(testDir, "mimetype-install")
+	for _, plugin := range []string{"yaml-frontmatter", "audio", "image"} {
+		binary := filepath.Join(testDir, plugin)
+		cmd := exec.Command(installer, "--user", binary)
+		cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+testDir)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("install %s: %v\n%s", plugin, err, output)
 		}
 	}
 	return nil
@@ -1053,6 +1041,197 @@ func TestImagePluginReadOnly(t *testing.T) {
 	_, err := runCLI(t, "add", "--file-only", "samples/image.jpg", "test", "value")
 	if err == nil {
 		t.Error("expected add to fail on read-only image plugin")
+	}
+}
+
+// runPlugin runs a plugin binary directly (not via symlink) with the given args.
+func runPlugin(t *testing.T, plugin string, args ...string) (string, string, error) {
+	t.Helper()
+	binary := filepath.Join(testDir, plugin)
+	cmd := exec.Command(binary, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), stderr.String(), err
+}
+
+func TestPluginCapabilities(t *testing.T) {
+	stdout, _, err := runPlugin(t, "yaml-frontmatter", "--capabilities")
+	if err != nil {
+		t.Fatalf("--capabilities failed: %v", err)
+	}
+
+	caps, err := pluginio.DeserializeCapabilities(stdout)
+	if err != nil {
+		t.Fatalf("failed to parse capabilities: %v", err)
+	}
+
+	expectedMimetypes := []string{"text/markdown", "text/plain"}
+	for _, mt := range expectedMimetypes {
+		found := false
+		for _, got := range caps.Mimetypes {
+			if got == mt {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected mimetype %q in capabilities, got: %v", mt, caps.Mimetypes)
+		}
+	}
+
+	expectedCommands := []string{"metadata-add", "metadata-delete", "metadata-list"}
+	for _, cmd := range expectedCommands {
+		found := false
+		for _, got := range caps.Commands {
+			if got == cmd {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected command %q in capabilities, got: %v", cmd, caps.Commands)
+		}
+	}
+}
+
+func TestPluginCapabilitiesAudio(t *testing.T) {
+	stdout, _, err := runPlugin(t, "audio", "--capabilities")
+	if err != nil {
+		t.Fatalf("--capabilities failed: %v", err)
+	}
+
+	caps, err := pluginio.DeserializeCapabilities(stdout)
+	if err != nil {
+		t.Fatalf("failed to parse capabilities: %v", err)
+	}
+
+	expectedMimetypes := []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg"}
+	for _, mt := range expectedMimetypes {
+		found := false
+		for _, got := range caps.Mimetypes {
+			if got == mt {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected mimetype %q in capabilities, got: %v", mt, caps.Mimetypes)
+		}
+	}
+
+	if len(caps.Commands) != 1 || caps.Commands[0] != "metadata-list" {
+		t.Errorf("expected commands [metadata-list], got: %v", caps.Commands)
+	}
+}
+
+func TestPluginCapabilitiesImage(t *testing.T) {
+	stdout, _, err := runPlugin(t, "image", "--capabilities")
+	if err != nil {
+		t.Fatalf("--capabilities failed: %v", err)
+	}
+
+	caps, err := pluginio.DeserializeCapabilities(stdout)
+	if err != nil {
+		t.Fatalf("failed to parse capabilities: %v", err)
+	}
+
+	if len(caps.Mimetypes) != 1 || caps.Mimetypes[0] != "image/jpeg" {
+		t.Errorf("expected mimetypes [image/jpeg], got: %v", caps.Mimetypes)
+	}
+
+	if len(caps.Commands) != 1 || caps.Commands[0] != "metadata-list" {
+		t.Errorf("expected commands [metadata-list], got: %v", caps.Commands)
+	}
+}
+
+func TestMimetypeInstallAndUninstall(t *testing.T) {
+	tmpDir := t.TempDir()
+	pluginBinary := filepath.Join(testDir, "yaml-frontmatter")
+	installer := filepath.Join(testDir, "mimetype-install")
+
+	// Install with --user, using tmpDir as XDG_CONFIG_HOME
+	cmd := exec.Command(installer, "--user", pluginBinary)
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+tmpDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("install failed: %v\n%s", err, output)
+	}
+
+	// Verify symlinks exist for each mimetype/command combination
+	expectedMimetypes := []string{"text/markdown", "text/plain"}
+	expectedCommands := []string{"metadata-add", "metadata-delete", "metadata-list"}
+	mimetypeBase := filepath.Join(tmpDir, "mimetype")
+
+	for _, mt := range expectedMimetypes {
+		for _, command := range expectedCommands {
+			linkPath := filepath.Join(mimetypeBase, mt, command)
+			target, err := os.Readlink(linkPath)
+			if err != nil {
+				t.Errorf("expected symlink at %s, got error: %v", linkPath, err)
+				continue
+			}
+			if target != pluginBinary {
+				t.Errorf("symlink %s points to %q, expected %q", linkPath, target, pluginBinary)
+			}
+		}
+	}
+
+	// Uninstall
+	cmd = exec.Command(installer, "--user", "--uninstall", pluginBinary)
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+tmpDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("uninstall failed: %v\n%s", err, output)
+	}
+
+	// Verify symlinks are removed
+	for _, mt := range expectedMimetypes {
+		for _, command := range expectedCommands {
+			linkPath := filepath.Join(mimetypeBase, mt, command)
+			if _, err := os.Lstat(linkPath); !os.IsNotExist(err) {
+				t.Errorf("expected symlink %s to be removed after uninstall", linkPath)
+			}
+		}
+	}
+
+	// Verify empty mimetype dirs were cleaned up
+	for _, mt := range expectedMimetypes {
+		dir := filepath.Join(mimetypeBase, mt)
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Errorf("expected directory %s to be removed after uninstall", dir)
+		}
+	}
+}
+
+func TestPluginUnknownSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	pluginBinary := filepath.Join(testDir, "yaml-frontmatter")
+	bogusLink := filepath.Join(tmpDir, "metadata-bogus")
+
+	if err := os.Symlink(pluginBinary, bogusLink); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	cmd := exec.Command(bogusLink)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err == nil {
+		t.Error("expected non-zero exit code for unknown symlink name")
+	}
+	if !strings.Contains(stderr.String(), "Usage") {
+		t.Errorf("expected usage message on stderr, got: %s", stderr.String())
+	}
+}
+
+func TestPluginDirectInvocation(t *testing.T) {
+	_, stderr, err := runPlugin(t, "yaml-frontmatter")
+	if err == nil {
+		t.Error("expected non-zero exit code for direct invocation without --capabilities")
+	}
+	if !strings.Contains(stderr, "Usage") {
+		t.Errorf("expected usage message on stderr, got: %s", stderr)
 	}
 }
 

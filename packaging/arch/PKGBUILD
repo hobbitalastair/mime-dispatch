@@ -20,6 +20,11 @@ build() {
   go build -v \
     -trimpath \
     -ldflags "-linkmode=external" \
+    -o "$srcdir/mimetype-install" ./cmd/mimetype-install
+
+  go build -v \
+    -trimpath \
+    -ldflags "-linkmode=external" \
     -o "$srcdir/metadata-yaml-frontmatter" ./plugins/yaml-frontmatter
 
   cd "$startdir/../../plugins/audio"
@@ -36,36 +41,12 @@ build() {
 }
 
 package() {
-  # Main binary
   install -Dm755 "$srcdir/metadata" "$pkgdir/usr/bin/metadata"
+  install -Dm755 "$srcdir/mimetype-install" "$pkgdir/usr/bin/mimetype-install"
 
-  # Plugin binaries
-  install -Dm755 "$srcdir/metadata-yaml-frontmatter" "$pkgdir/usr/lib/metadata/metadata-yaml-frontmatter"
-  install -Dm755 "$srcdir/metadata-audio"    "$pkgdir/usr/lib/metadata/metadata-audio"
-  install -Dm755 "$srcdir/metadata-image"    "$pkgdir/usr/lib/metadata/metadata-image"
-
-  # YAML frontmatter plugin: text/markdown, text/plain (list, add, delete)
-  install -dm755 "$pkgdir/usr/lib/mimetype/text/markdown"
-  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/markdown/metadata-list"
-  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/markdown/metadata-add"
-  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/markdown/metadata-delete"
-
-  install -dm755 "$pkgdir/usr/lib/mimetype/text/plain"
-  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/plain/metadata-list"
-  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/plain/metadata-add"
-  ln -s ../../../metadata/metadata-yaml-frontmatter "$pkgdir/usr/lib/mimetype/text/plain/metadata-delete"
-
-  # Audio plugin: audio/mpeg, audio/ogg, audio/x-vorbis+ogg (list only)
-  install -dm755 "$pkgdir/usr/lib/mimetype/audio/mpeg"
-  ln -s ../../../metadata/metadata-audio "$pkgdir/usr/lib/mimetype/audio/mpeg/metadata-list"
-
-  install -dm755 "$pkgdir/usr/lib/mimetype/audio/ogg"
-  ln -s ../../../metadata/metadata-audio "$pkgdir/usr/lib/mimetype/audio/ogg/metadata-list"
-
-  install -dm755 "$pkgdir/usr/lib/mimetype/audio/x-vorbis+ogg"
-  ln -s ../../../metadata/metadata-audio "$pkgdir/usr/lib/mimetype/audio/x-vorbis+ogg/metadata-list"
-
-  # Image plugin: image/jpeg (list only)
-  install -dm755 "$pkgdir/usr/lib/mimetype/image/jpeg"
-  ln -s ../../../metadata/metadata-image "$pkgdir/usr/lib/mimetype/image/jpeg/metadata-list"
+  for plugin in metadata-yaml-frontmatter metadata-audio metadata-image; do
+    install -Dm755 "$srcdir/$plugin" "$pkgdir/usr/lib/metadata/$plugin"
+    DESTDIR="$pkgdir" "$srcdir/mimetype-install" --vendor \
+      "$pkgdir/usr/lib/metadata/$plugin"
+  done
 }
