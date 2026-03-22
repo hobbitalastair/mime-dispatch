@@ -8,8 +8,8 @@ ifdef LDFLAGS
 GO_BUILD += -ldflags "$(LDFLAGS)"
 endif
 
-BINARIES = metadata open mime-dispatch-install metadata-yaml-frontmatter
-PLUGINS = metadata-audio metadata-image
+BINARIES = metadata open mime-dispatch-install
+PLUGINS = metadata-yaml-frontmatter metadata-audio metadata-image
 
 .PHONY: build binaries plugins test test-unit test-e2e vet format clean
 
@@ -29,7 +29,7 @@ $(OUTDIR)/mime-dispatch-install:
 	$(GO_BUILD) -o $@ ./cmd/mime-dispatch-install
 
 $(OUTDIR)/metadata-yaml-frontmatter:
-	$(GO_BUILD) -o $@ ./plugins/yaml-frontmatter
+	cd plugins/yaml-frontmatter && $(GO_BUILD) -o $@ .
 
 $(OUTDIR)/metadata-audio:
 	cd plugins/audio && $(GO_BUILD) -o $@ .
@@ -52,6 +52,7 @@ format:
 	gofmt -w .
 	cd plugins/audio && gofmt -w .
 	cd plugins/image && gofmt -w .
+	cd plugins/yaml-frontmatter && gofmt -w .
 
 clean:
 	rm -rf $(OUTDIR)
