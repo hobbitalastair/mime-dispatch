@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"metadata/pkg/plugincli"
-	"metadata/pkg/pluginio"
+	"mime-dispatch/pkg/plugincli"
+	"mime-dispatch/pkg/pluginio"
 	"os"
 	"time"
 

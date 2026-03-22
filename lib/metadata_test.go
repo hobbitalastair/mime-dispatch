@@ -18,7 +18,7 @@ func TestMergeMetadata(t *testing.T) {
 			expected: map[string][]string{},
 		},
 		{
-			name:     "xattr takes precedence",
+			name:     "disjoint values merged",
 			fileMeta: map[string][]string{"key": {"file-value"}},
 			xattrMap: map[string][]string{"key": {"xattr-value"}},
 			expected: map[string][]string{"key": {"file-value", "xattr-value"}},
@@ -59,74 +59,17 @@ func TestMergeMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := MergeMetadata(tt.fileMeta, tt.xattrMap)
+			if len(result) != len(tt.expected) {
+				t.Errorf("expected %d keys, got %d", len(tt.expected), len(result))
+			}
 			for k, v := range tt.expected {
 				if len(result[k]) != len(v) {
-					t.Errorf("expected %v, got %v", v, result[k])
+					t.Errorf("key %q: expected %v, got %v", k, v, result[k])
 					continue
 				}
 				for i, val := range v {
 					if result[k][i] != val {
-						t.Errorf("expected %v, got %v", v, result[k])
-					}
-				}
-			}
-		})
-	}
-}
-
-func TestParsePluginOutput(t *testing.T) {
-	tests := []struct {
-		name     string
-		output   string
-		expected map[string][]string
-	}{
-		{
-			name:     "empty output",
-			output:   "",
-			expected: map[string][]string{},
-		},
-		{
-			name:     "single key-value",
-			output:   "key: value",
-			expected: map[string][]string{"key": {"value"}},
-		},
-		{
-			name:   "multiple key-values",
-			output: "key1: value1\nkey2: value2",
-			expected: map[string][]string{
-				"key1": {"value1"},
-				"key2": {"value2"},
-			},
-		},
-		{
-			name:     "multi-valued key",
-			output:   "key:\n  - value1\n  - value2",
-			expected: map[string][]string{"key": {"value1", "value2"}},
-		},
-		{
-			name:   "ignore empty lines",
-			output: "key: value\n\nkey2: value2\n",
-			expected: map[string][]string{
-				"key":  {"value"},
-				"key2": {"value2"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParsePluginOutput(tt.output)
-			if err != nil {
-				t.Fatalf("ParsePluginOutput error: %v", err)
-			}
-			for k, v := range tt.expected {
-				if len(result[k]) != len(v) {
-					t.Errorf("expected %v, got %v", v, result[k])
-					continue
-				}
-				for i, val := range v {
-					if result[k][i] != val {
-						t.Errorf("expected %v, got %v", v, result[k])
+						t.Errorf("key %q: expected %v, got %v", k, v, result[k])
 					}
 				}
 			}

@@ -2,7 +2,7 @@ package lib
 
 import (
 	"bytes"
-	"metadata/pkg/pluginio"
+	"mime-dispatch/pkg/pluginio"
 	"os"
 	"os/exec"
 	"os/user"
@@ -72,21 +72,6 @@ func FindPluginForCommand(mimeType string, command PluginCommand) (string, error
 		}
 	}
 
-	if command == PluginList {
-		genericPath := mimeType
-		for _, baseDir := range pluginSearchPathsFn() {
-			fullPath := filepath.Join(baseDir, genericPath)
-			info, err := os.Lstat(fullPath)
-			if err != nil {
-				continue
-			}
-
-			if info.Mode()&os.ModeSymlink != 0 {
-				return fullPath, nil
-			}
-		}
-	}
-
 	return "", ErrNoPluginFound{MimeType: mimeType, Command: command}
 }
 
@@ -108,7 +93,8 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 	err := cmd.Run()
 	if err != nil {
 		return nil, PluginError{
-			Stderr: stderr.String(),
+			PluginPath: pluginPath,
+			Stderr:     stderr.String(),
 		}
 	}
 
@@ -116,10 +102,14 @@ func RunPlugin(pluginPath string, command PluginCommand, filePath, key, value st
 }
 
 type PluginError struct {
-	Stderr string
+	PluginPath string
+	Stderr     string
 }
 
 func (e PluginError) Error() string {
+	if e.PluginPath != "" {
+		return e.PluginPath + ": " + e.Stderr
+	}
 	return e.Stderr
 }
 

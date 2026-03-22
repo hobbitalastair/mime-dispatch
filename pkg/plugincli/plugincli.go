@@ -3,7 +3,7 @@ package plugincli
 import (
 	"errors"
 	"fmt"
-	"metadata/pkg/pluginio"
+	"mime-dispatch/pkg/pluginio"
 	"os"
 	"path/filepath"
 	"sort"

@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"metadata/pkg/pluginio"
+	"mime-dispatch/pkg/pluginio"
 	"os"
 	"os/exec"
 	osuser "os/user"
@@ -21,7 +21,7 @@ func main() {
 	uninstall := pflag.Bool("uninstall", false, "Remove symlinks instead of creating them")
 
 	pflag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: mimetype-install [--user|--system|--vendor] [--mimetype <type>]... [--uninstall] <binary-path>")
+		fmt.Fprintln(os.Stderr, "Usage: mime-dispatch-install [--user|--system|--vendor] [--mimetype <type>]... [--uninstall] <binary-path>")
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Install or uninstall MIME type handler symlinks for a plugin binary.")
 		fmt.Fprintln(os.Stderr, "The plugin must support --capabilities to declare its MIME types and commands.")

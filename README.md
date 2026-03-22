@@ -1,16 +1,52 @@
-# Metadata
+# mime-dispatch
 
-If metadata for files is stored inside the files, I need a way to programmatically extract the data.
-This should be plug-in based to support new file formats.
+A suite of file-type-independent tools dispatched by MIME type. Plugins register handlers for specific MIME types and commands; the dispatcher selects the right handler based on each file's detected type.
 
-Metadata can be assumed to be stored as key:value pairs, where both are UTF-8 encoded strings?
-Output should be in some standard format (eg YAML?) although this may add serialization/deserialization requirements.
+## Tools
 
-There should be a command line tool to dump the metadata from a file.
-It would be smart to have a library that loaded the config up front to avoid the execution + config load cost when processing many files.
+- `metadata` -- List, add, and delete file metadata. Combines plugin output with extended attributes (xattrs) as a secondary storage layer for file formats that don't support embedded metadata.
+- `open` -- Open files using MIME-type-specific handlers.
+- `mime-dispatch-install` -- Create symlink structures to install plugins.
 
-It would be nice to be able to manipulate the metadata (delete and set).
+## Plugins
 
-Most metadata should live inside the file, but some file formats do not support this. It might be wise to use extended attributes as a secondary location.
-The file's mime type should likely be exposed as metadata, but stored as an extended attribute.
+Included plugins:
 
+- `yaml-frontmatter` -- YAML front matter in Markdown and plain text files (read/write).
+- `audio` -- MP3 (ID3) and OGG (Vorbis) tags (read-only).
+- `image` -- JPEG EXIF data (read-only).
+
+See `spec/plugins.md` for how to write and install plugins.
+
+## Dependencies
+
+- `perl-file-mimeinfo` (provides the `mimetype` command for MIME type detection)
+- Go 1.25+
+
+## Building
+
+```sh
+make build
+```
+
+Binaries are placed in `build/` by default. Override with `OUTDIR`:
+
+```sh
+make build OUTDIR=/usr/local/bin
+```
+
+## Testing
+
+```sh
+make test          # unit + end-to-end
+make test-unit     # unit tests only
+make test-e2e      # end-to-end (builds all binaries, installs plugins)
+```
+
+## Specifications
+
+- `spec/cli.md` -- CLI interface and flags.
+- `spec/flow.md` -- Metadata and open command execution flow.
+- `spec/plugins.md` -- Plugin structure, search paths, and installation.
+- `spec/tags.md` -- Standardized metadata tag names and value formats.
+- `spec/xattr.md` -- Extended attribute namespaces and encoding.

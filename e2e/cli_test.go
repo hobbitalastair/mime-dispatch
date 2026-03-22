@@ -1,9 +1,12 @@
+// Package e2e contains end-to-end tests that build all binaries (metadata, open,
+// mime-dispatch-install) and all plugins, install them, and test the full CLI.
+// Run with: go test ./e2e/ -v
 package e2e
 
 import (
 	"bytes"
 	"fmt"
-	"metadata/pkg/pluginio"
+	"mime-dispatch/pkg/pluginio"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,7 +61,7 @@ func buildAll() error {
 	}{
 		{"cli", "../cmd/metadata"},
 		{"open", "../cmd/open"},
-		{"mimetype-install", "../cmd/mimetype-install"},
+		{"mime-dispatch-install", "../cmd/mime-dispatch-install"},
 		{"yaml-frontmatter", "../plugins/yaml-frontmatter"},
 		{"audio", "../plugins/audio"},
 		{"image", "../plugins/image"},
@@ -91,7 +94,7 @@ func buildAll() error {
 }
 
 func installPlugins() error {
-	installer := filepath.Join(testDir, "mimetype-install")
+	installer := filepath.Join(testDir, "mime-dispatch-install")
 	for _, plugin := range []string{"yaml-frontmatter", "audio", "image"} {
 		binary := filepath.Join(testDir, plugin)
 		cmd := exec.Command(installer, "--user", binary)
@@ -1165,7 +1168,7 @@ func TestPluginCapabilitiesImage(t *testing.T) {
 func TestMimetypeInstallAndUninstall(t *testing.T) {
 	tmpDir := t.TempDir()
 	pluginBinary := filepath.Join(testDir, "yaml-frontmatter")
-	installer := filepath.Join(testDir, "mimetype-install")
+	installer := filepath.Join(testDir, "mime-dispatch-install")
 
 	// Install with --user, using tmpDir as XDG_CONFIG_HOME
 	cmd := exec.Command(installer, "--user", pluginBinary)

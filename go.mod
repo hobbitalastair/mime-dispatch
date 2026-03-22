@@ -1,4 +1,4 @@
-module metadata
+module mime-dispatch
 
 go 1.25.0
 

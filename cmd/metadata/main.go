@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"metadata/pkg/pluginio"
+	"mime-dispatch/pkg/pluginio"
 	"os"
 
-	"metadata/lib"
+	"mime-dispatch/lib"
 
 	"github.com/spf13/pflag"
 )

@@ -46,10 +46,10 @@ commands:
 
 ## Installing Plugins
 
-The `mimetype-install` tool creates (or removes) the symlink structure for a plugin binary based on its declared capabilities.
+The `mime-dispatch-install` tool creates (or removes) the symlink structure for a plugin binary based on its declared capabilities.
 
 ```
-mimetype-install [--user|--system|--vendor] [--mimetype <type>]... [--uninstall] <binary-path>
+mime-dispatch-install [--user|--system|--vendor] [--mimetype <type>]... [--uninstall] <binary-path>
 ```
 
 ### Levels
@@ -65,25 +65,25 @@ mimetype-install [--user|--system|--vendor] [--mimetype <type>]... [--uninstall]
 Install a plugin for the current user:
 
 ```
-mimetype-install --user ~/.local/lib/metadata/metadata-yaml-frontmatter
+mime-dispatch-install --user ~/.local/lib/mime-dispatch/metadata-yaml-frontmatter
 ```
 
 Install for a MIME type the plugin doesn't explicitly declare:
 
 ```
-mimetype-install --user --mimetype text/x-rst ~/.local/lib/metadata/metadata-yaml-frontmatter
+mime-dispatch-install --user --mimetype text/x-rst ~/.local/lib/mime-dispatch/metadata-yaml-frontmatter
 ```
 
 Uninstall a plugin:
 
 ```
-mimetype-install --user --uninstall ~/.local/lib/metadata/metadata-yaml-frontmatter
+mime-dispatch-install --user --uninstall ~/.local/lib/mime-dispatch/metadata-yaml-frontmatter
 ```
 
 Distribution packaging (with DESTDIR):
 
 ```
-DESTDIR="$pkgdir" mimetype-install --vendor "$pkgdir/usr/lib/metadata/metadata-audio"
+DESTDIR="$pkgdir" mime-dispatch-install --vendor "$pkgdir/usr/lib/mime-dispatch/metadata-audio"
 ```
 
 The `DESTDIR` environment variable prefixes all filesystem operations. Symlinks always point to the final absolute path (with DESTDIR stripped).

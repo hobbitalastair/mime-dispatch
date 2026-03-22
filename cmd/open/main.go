@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"metadata/lib"
+	"mime-dispatch/lib"
 	"os"
 	"os/exec"
 )

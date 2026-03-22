@@ -2,12 +2,21 @@ package lib
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
+func skipIfNoMimetypeCommand(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("mimetype"); err != nil {
+		t.Skip("mimetype command not found (install perl-file-mimeinfo)")
+	}
+}
+
 func TestDetectMimetype(t *testing.T) {
+	skipIfNoMimetypeCommand(t)
 	// Create a temporary file with known content
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
@@ -28,6 +37,7 @@ func TestDetectMimetype(t *testing.T) {
 }
 
 func TestDetectMimetype_NonexistentFile(t *testing.T) {
+	skipIfNoMimetypeCommand(t)
 	mimeType, err := DetectMimetype("/nonexistent/file/that/does/not/exist.txt")
 	// mimetype command may or may not error on nonexistent files depending on version
 	// If it doesn't error, it typically returns inode/x-empty or similar
@@ -70,6 +80,7 @@ func TestGetMimeType_FromXattr(t *testing.T) {
 }
 
 func TestGetMimeType_DetectAndCache(t *testing.T) {
+	skipIfNoMimetypeCommand(t)
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
 
@@ -104,6 +115,7 @@ func TestGetMimeType_DetectAndCache(t *testing.T) {
 }
 
 func TestGetMimeType_FileOnly(t *testing.T) {
+	skipIfNoMimetypeCommand(t)
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
 

@@ -1,6 +1,6 @@
 # Standard Metadata Tags
 
-This document defines standard metadata tags and value formats used by the metadata tool.
+This document defines standard metadata tags and value formats used by metadata plugins.
 
 Values are serialized as YAML scalars or YAML sequences of scalars.
 

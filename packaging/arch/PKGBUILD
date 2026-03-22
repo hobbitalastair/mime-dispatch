@@ -1,7 +1,7 @@
-pkgname=metadata
+pkgname=mime-dispatch
 pkgver=1
 pkgrel=1
-pkgdesc="CLI tool for manipulating file metadata"
+pkgdesc="Suite of file-type-independent tools dispatched by MIME type"
 arch=('x86_64')
 license=('MIT')
 depends=('perl-file-mimeinfo')
@@ -11,48 +11,17 @@ sha256sums=()
 
 build() {
   cd "$startdir/../.."
-
-  go build -v \
-    -trimpath \
-    -ldflags "-linkmode=external" \
-    -o "$srcdir/metadata" ./cmd/metadata
-
-  go build -v \
-    -trimpath \
-    -ldflags "-linkmode=external" \
-    -o "$srcdir/mimetype-install" ./cmd/mimetype-install
-
-  go build -v \
-    -trimpath \
-    -ldflags "-linkmode=external" \
-    -o "$srcdir/metadata-open" ./cmd/open
-
-  go build -v \
-    -trimpath \
-    -ldflags "-linkmode=external" \
-    -o "$srcdir/metadata-yaml-frontmatter" ./plugins/yaml-frontmatter
-
-  cd "$startdir/../../plugins/audio"
-  go build -v \
-    -trimpath \
-    -ldflags "-linkmode=external" \
-    -o "$srcdir/metadata-audio" .
-
-  cd "$startdir/../../plugins/image"
-  go build -v \
-    -trimpath \
-    -ldflags "-linkmode=external" \
-    -o "$srcdir/metadata-image" .
+  make build OUTDIR="$srcdir" GOFLAGS="-v -trimpath" LDFLAGS="-linkmode=external"
 }
 
 package() {
   install -Dm755 "$srcdir/metadata" "$pkgdir/usr/bin/metadata"
-  install -Dm755 "$srcdir/mimetype-install" "$pkgdir/usr/bin/mimetype-install"
-  install -Dm755 "$srcdir/metadata-open" "$pkgdir/usr/bin/metadata-open"
+  install -Dm755 "$srcdir/mime-dispatch-install" "$pkgdir/usr/bin/mime-dispatch-install"
+  install -Dm755 "$srcdir/open" "$pkgdir/usr/bin/open"
 
   for plugin in metadata-yaml-frontmatter metadata-audio metadata-image; do
-    install -Dm755 "$srcdir/$plugin" "$pkgdir/usr/lib/metadata/$plugin"
-    DESTDIR="$pkgdir" "$srcdir/mimetype-install" --vendor \
-      "$pkgdir/usr/lib/metadata/$plugin"
+    install -Dm755 "$srcdir/$plugin" "$pkgdir/usr/lib/mime-dispatch/$plugin"
+    DESTDIR="$pkgdir" "$srcdir/mime-dispatch-install" --vendor \
+      "$pkgdir/usr/lib/mime-dispatch/$plugin"
   done
 }

@@ -13,8 +13,6 @@ type Options struct {
 	FileOnly  bool
 }
 
-type Metadata map[string][]string
-
 func MergeMetadata(fileMeta, xattrMeta map[string][]string) map[string][]string {
 	seen := make(map[string]map[string]struct{})
 	addMetadata := func(key string, values []string) {
@@ -41,9 +39,9 @@ func MergeMetadata(fileMeta, xattrMeta map[string][]string) map[string][]string 
 	return result
 }
 
-func GetMetadata(filePath string, opts Options) (Metadata, error) {
-	var xattrMeta Metadata
-	var fileMeta Metadata
+func GetMetadata(filePath string, opts Options) (map[string][]string, error) {
+	var xattrMeta map[string][]string
+	var fileMeta map[string][]string
 
 	if !opts.FileOnly {
 		xattrs, err := GetXattr(filePath)
@@ -63,7 +61,7 @@ func GetMetadata(filePath string, opts Options) (Metadata, error) {
 
 		if !opts.FileOnly {
 			if xattrMeta == nil {
-				xattrMeta = make(Metadata)
+				xattrMeta = make(map[string][]string)
 			}
 			xattrMeta["mime_type"] = []string{mimeType}
 		}
@@ -170,15 +168,15 @@ func DeleteMetadata(filePath, key, value string, opts Options) error {
 		}
 	}
 
-	if !opts.FileOnly {
-		if err := DeleteXattr(filePath, key, value); err != nil {
+	if deletePluginPath != "" {
+		_, err := RunPlugin(deletePluginPath, PluginDelete, filePath, key, value)
+		if err != nil {
 			return err
 		}
 	}
 
-	if deletePluginPath != "" {
-		_, err := RunPlugin(deletePluginPath, PluginDelete, filePath, key, value)
-		if err != nil {
+	if !opts.FileOnly {
+		if err := DeleteXattr(filePath, key, value); err != nil {
 			return err
 		}
 	}

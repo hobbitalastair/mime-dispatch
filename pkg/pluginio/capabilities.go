@@ -25,7 +25,7 @@ func SerializeCapabilities(mimetypes, commands []string) (string, error) {
 }
 
 // DeserializedCapabilities is the data-only form returned by
-// DeserializeCapabilities, used by tools like mimetype-install
+// DeserializeCapabilities, used by tools like mime-dispatch-install
 // that need the declared names without handler functions.
 type DeserializedCapabilities struct {
 	Mimetypes []string `yaml:"mimetypes"`

@@ -394,3 +394,23 @@ func TestDeleteXattr_LastValue(t *testing.T) {
 		t.Errorf("expected xattr to be removed, got value: %q", rawValue)
 	}
 }
+
+func TestDeleteXattr_NonexistentKey(t *testing.T) {
+	if !xattr.XATTR_SUPPORTED {
+		t.Skip("xattr not supported")
+	}
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+
+	err := os.WriteFile(testFile, []byte("test"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	// Deleting a key that was never set should succeed (idempotent)
+	err = DeleteXattr(testFile, "nonexistent_key", "any_value")
+	if err != nil {
+		t.Errorf("DeleteXattr on nonexistent key should succeed, got error: %v", err)
+	}
+}
