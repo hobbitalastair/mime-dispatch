@@ -28,7 +28,7 @@ var openBinary string
 
 func TestMain(m *testing.M) {
 	var err error
-	testDir, err = os.MkdirTemp("", "metadata-e2e-*")
+	testDir, err = os.MkdirTemp("", "mime-dispatch-e2e-*")
 	if err != nil {
 		panic(err)
 	}
