@@ -36,3 +36,23 @@ It only considers file contents and ignores the file's extended attributes.
 Metadata from both file contents and extended attributes are combined. Keys may be multi valued, but duplicates (the same entry in xattr and in the file) should be removed.
 
 The merged result is returned.
+
+## Open Command Flow
+
+The `open` binary follows a simpler flow for each file:
+
+### 1. Detect MIME type
+
+Same as steps 1–2 above: read `user.mime_type` from xattr, falling back to detection via the `mimetype` command.
+
+### 2. Find open handler
+
+Search for `<mime-type>/open` in the plugin search directories (same order as metadata plugins).
+
+If no handler is found, print an error for that file and continue to the next file.
+
+### 3. Execute handler
+
+Run the handler with the file path as its sole argument. The handler inherits stdin, stdout, and stderr so it can be interactive (e.g. launching an editor, viewer, or player). No sandboxing is applied.
+
+If the handler exits with a non-zero status, the error is reported and processing continues with the remaining files. The `open` binary exits non-zero if any file failed.

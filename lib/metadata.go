@@ -186,13 +186,20 @@ func DeleteMetadata(filePath, key, value string, opts Options) error {
 	return nil
 }
 
+// GetMimeType returns the MIME type for a file, using the cached value
+// from the user.mime_type xattr if available, otherwise detecting it
+// and caching the result.
+func GetMimeType(filePath string) (string, error) {
+	return getMimeType(filePath, Options{})
+}
+
 func getMimeType(filePath string, opts Options) (string, error) {
 	if opts.FileOnly {
 		return DetectMimetype(filePath)
 	}
 
 	mimeType, err := GetXattrValue(filePath, "mime_type")
-	if err != nil {
+	if err != nil && err != ErrXattrNotSupported {
 		return "", err
 	}
 
@@ -205,9 +212,8 @@ func getMimeType(filePath string, opts Options) (string, error) {
 		return "", err
 	}
 
-	if err := SetXattr(filePath, "mime_type", mimeType); err != nil {
-		return "", err
-	}
+	// Best-effort cache; ignore errors on filesystems without xattr support.
+	_ = SetXattr(filePath, "mime_type", mimeType)
 
 	return mimeType, nil
 }

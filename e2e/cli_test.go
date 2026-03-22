@@ -20,6 +20,9 @@ var testDir string
 // cliBinary is the path to the compiled metadata CLI binary.
 var cliBinary string
 
+// openBinary is the path to the compiled open binary.
+var openBinary string
+
 func TestMain(m *testing.M) {
 	var err error
 	testDir, err = os.MkdirTemp("", "metadata-e2e-*")
@@ -54,6 +57,7 @@ func buildAll() error {
 		dir  string
 	}{
 		{"cli", "../cmd/metadata"},
+		{"open", "../cmd/open"},
 		{"mimetype-install", "../cmd/mimetype-install"},
 		{"yaml-frontmatter", "../plugins/yaml-frontmatter"},
 		{"audio", "../plugins/audio"},
@@ -82,6 +86,7 @@ func buildAll() error {
 		}
 	}
 	cliBinary = filepath.Join(testDir, "cli")
+	openBinary = filepath.Join(testDir, "open")
 	return nil
 }
 
@@ -102,6 +107,17 @@ func runCLI(t *testing.T, args ...string) (string, error) {
 	cmd := exec.Command(cliBinary, args...)
 	output, err := cmd.CombinedOutput()
 	return string(output), err
+}
+
+func runOpen(t *testing.T, args ...string) (string, string, error) {
+	t.Helper()
+	cmd := exec.Command(openBinary, args...)
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+testDir)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), stderr.String(), err
 }
 
 func parseMetadataOutput(t *testing.T, output string) map[string][]string {
@@ -1232,6 +1248,171 @@ func TestPluginDirectInvocation(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "Usage") {
 		t.Errorf("expected usage message on stderr, got: %s", stderr)
+	}
+}
+
+func TestOpenNoArgs(t *testing.T) {
+	_, stderr, err := runOpen(t)
+	if err == nil {
+		t.Error("expected non-zero exit code for open with no args")
+	}
+	if !strings.Contains(stderr, "Usage") {
+		t.Errorf("expected usage message on stderr, got: %s", stderr)
+	}
+}
+
+func TestOpenWithHandler(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test handler script that writes a marker file
+	markerFile := filepath.Join(tmpDir, "opened.txt")
+	handlerScript := filepath.Join(tmpDir, "test-open-handler")
+	err := os.WriteFile(handlerScript, []byte(fmt.Sprintf("#!/bin/sh\necho \"$1\" > %s\n", markerFile)), 0755)
+	if err != nil {
+		t.Fatalf("failed to create handler script: %v", err)
+	}
+
+	// Install handler: create mimetype/text/markdown/open -> handlerScript
+	mimetypeDir := filepath.Join(testDir, "mimetype", "text", "markdown")
+	openLink := filepath.Join(mimetypeDir, "open")
+
+	// mimetypeDir should already exist from plugin installation
+	if err := os.Symlink(handlerScript, openLink); err != nil {
+		t.Fatalf("failed to create open symlink: %v", err)
+	}
+	defer os.Remove(openLink)
+
+	// Create a test markdown file
+	testFile := filepath.Join(tmpDir, "test.md")
+	err = os.WriteFile(testFile, []byte("# Hello\n"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, stderr, err := runOpen(t, testFile)
+	if err != nil {
+		t.Fatalf("open failed: %v, stderr: %s", err, stderr)
+	}
+
+	// Verify the handler was executed
+	content, err := os.ReadFile(markerFile)
+	if err != nil {
+		t.Fatalf("marker file not created — handler was not executed: %v", err)
+	}
+	if strings.TrimSpace(string(content)) != testFile {
+		t.Errorf("handler received wrong path: got %q, expected %q", strings.TrimSpace(string(content)), testFile)
+	}
+}
+
+func TestOpenNoHandler(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a file with a type that has no open handler
+	testFile := filepath.Join(tmpDir, "test.bin")
+	err := os.WriteFile(testFile, []byte{0x00, 0x01, 0x02}, 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, stderr, err := runOpen(t, testFile)
+	if err == nil {
+		t.Error("expected non-zero exit for file with no open handler")
+	}
+	if !strings.Contains(stderr, "no open handler") {
+		t.Errorf("expected 'no open handler' in stderr, got: %s", stderr)
+	}
+}
+
+func TestOpenMultipleFilesMixedSuccess(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a handler for text/markdown
+	markerFile := filepath.Join(tmpDir, "opened.txt")
+	handlerScript := filepath.Join(tmpDir, "test-open-handler")
+	err := os.WriteFile(handlerScript, []byte(fmt.Sprintf("#!/bin/sh\necho \"$1\" >> %s\n", markerFile)), 0755)
+	if err != nil {
+		t.Fatalf("failed to create handler script: %v", err)
+	}
+
+	mimetypeDir := filepath.Join(testDir, "mimetype", "text", "markdown")
+	openLink := filepath.Join(mimetypeDir, "open")
+	if err := os.Symlink(handlerScript, openLink); err != nil {
+		t.Fatalf("failed to create open symlink: %v", err)
+	}
+	defer os.Remove(openLink)
+
+	// Create a markdown file (handler exists)
+	mdFile := filepath.Join(tmpDir, "test.md")
+	err = os.WriteFile(mdFile, []byte("# Hello\n"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create md file: %v", err)
+	}
+
+	// Create a binary file (no handler)
+	binFile := filepath.Join(tmpDir, "test.bin")
+	err = os.WriteFile(binFile, []byte{0x00, 0x01, 0x02}, 0644)
+	if err != nil {
+		t.Fatalf("failed to create bin file: %v", err)
+	}
+
+	_, stderr, err := runOpen(t, mdFile, binFile)
+	if err == nil {
+		t.Error("expected non-zero exit when some files have no handler")
+	}
+	if !strings.Contains(stderr, "no open handler") {
+		t.Errorf("expected 'no open handler' in stderr, got: %s", stderr)
+	}
+
+	// Verify the markdown file was still opened
+	content, err := os.ReadFile(markerFile)
+	if err != nil {
+		t.Fatalf("marker file not created — handler was not executed for md file: %v", err)
+	}
+	if !strings.Contains(string(content), mdFile) {
+		t.Errorf("handler did not receive the md file path")
+	}
+}
+
+func TestOpenNonexistentFile(t *testing.T) {
+	_, stderr, err := runOpen(t, "/nonexistent/path/to/file.md")
+	if err == nil {
+		t.Error("expected non-zero exit for nonexistent file")
+	}
+	if stderr == "" {
+		t.Error("expected error message on stderr")
+	}
+}
+
+func TestOpenHandlerFails(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a handler that exits with status 1
+	handlerScript := filepath.Join(tmpDir, "failing-handler")
+	err := os.WriteFile(handlerScript, []byte("#!/bin/sh\nexit 1\n"), 0755)
+	if err != nil {
+		t.Fatalf("failed to create handler script: %v", err)
+	}
+
+	mimetypeDir := filepath.Join(testDir, "mimetype", "text", "markdown")
+	openLink := filepath.Join(mimetypeDir, "open")
+	if err := os.Symlink(handlerScript, openLink); err != nil {
+		t.Fatalf("failed to create open symlink: %v", err)
+	}
+	defer os.Remove(openLink)
+
+	// Create a markdown file
+	testFile := filepath.Join(tmpDir, "test.md")
+	err = os.WriteFile(testFile, []byte("# Hello\n"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, stderr, err := runOpen(t, testFile)
+	if err == nil {
+		t.Error("expected non-zero exit when handler fails")
+	}
+	if !strings.Contains(stderr, "handler exited with status") {
+		t.Errorf("expected 'handler exited with status' in stderr, got: %s", stderr)
 	}
 }
 

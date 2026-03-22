@@ -25,6 +25,11 @@ build() {
   go build -v \
     -trimpath \
     -ldflags "-linkmode=external" \
+    -o "$srcdir/metadata-open" ./cmd/open
+
+  go build -v \
+    -trimpath \
+    -ldflags "-linkmode=external" \
     -o "$srcdir/metadata-yaml-frontmatter" ./plugins/yaml-frontmatter
 
   cd "$startdir/../../plugins/audio"
@@ -43,6 +48,7 @@ build() {
 package() {
   install -Dm755 "$srcdir/metadata" "$pkgdir/usr/bin/metadata"
   install -Dm755 "$srcdir/mimetype-install" "$pkgdir/usr/bin/mimetype-install"
+  install -Dm755 "$srcdir/metadata-open" "$pkgdir/usr/bin/metadata-open"
 
   for plugin in metadata-yaml-frontmatter metadata-audio metadata-image; do
     install -Dm755 "$srcdir/$plugin" "$pkgdir/usr/lib/metadata/$plugin"

@@ -15,6 +15,7 @@ const (
 	PluginList PluginCommand = iota
 	PluginAdd
 	PluginDelete
+	PluginOpen
 )
 
 func (c PluginCommand) String() string {
@@ -25,6 +26,8 @@ func (c PluginCommand) String() string {
 		return "metadata-add"
 	case PluginDelete:
 		return "metadata-delete"
+	case PluginOpen:
+		return "open"
 	default:
 		return "unknown"
 	}
@@ -122,4 +125,15 @@ func (e PluginError) Error() string {
 
 func ParsePluginOutput(output string) (map[string][]string, error) {
 	return pluginio.DeserializeMetadata(output)
+}
+
+// RunOpenHandler executes an open handler for a file. The handler inherits
+// stdin, stdout, and stderr so it can interact with the user.
+func RunOpenHandler(handlerPath, filePath string) error {
+	cmd := exec.Command(handlerPath, filePath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }
