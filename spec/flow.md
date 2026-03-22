@@ -28,7 +28,7 @@ If using the default (both file and xattrs) and no plugin is found:
 
 ## 4. Execute plugin
 
-The plugin is executed as a subprocess. It communicates with the main program via stdin/stdout.
+The plugin is executed as a subprocess. It communicates with the main program via stdout.
 It only considers file contents and ignores the file's extended attributes.
 
 ## 5. Merge metadata
