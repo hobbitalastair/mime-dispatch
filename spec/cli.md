@@ -1,36 +1,40 @@
 # CLI Interface
 
-## Common Flags
+CLI interface description for the binaries in this repository.
+
+## `metadata`
+
+### Common Flags
 
 - `--xattr-only` - Only access extended attributes
 - `--file-only` - Only access file contents
 
 Commands apply to both file contents and extended attributes.
 
-## Commands
+### Commands
 
-### list
+#### list
 List all metadata from a file.
 
 ```
 metadata list <file>
 ```
 
-### add
+#### add
 Add a metadata key/value pair (appends to existing values).
 
 ```
 metadata add <file> <key> <value>
 ```
 
-### delete
+#### delete
 Delete a specific metadata key/value pair.
 
 ```
 metadata delete <file> <key> <value>
 ```
 
-## Output Format
+### Output Format
 
 All commands output flat YAML. Keys with multiple values use YAML sequences:
 
@@ -46,9 +50,10 @@ YAML formatting details (quoting style, scalar style, and indentation) are produ
 
 For standardized metadata keys and value formats, see `spec/tags.md`.
 
-## The `open` Binary
 
-The `open` binary is a separate executable that opens files using MIME-type-specific handlers. Unlike the `metadata` command, handlers inherit stdin/stdout/stderr and run without sandboxing, so they can launch interactive applications.
+## `open`
+
+Opens files using MIME-type-specific handlers. Handlers inherit stdin/stdout/stderr and run without sandboxing, so they can launch interactive applications.
 
 ```
 open <file>...
