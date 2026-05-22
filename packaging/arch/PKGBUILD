@@ -5,6 +5,7 @@ pkgdesc="Suite of file-type-independent tools dispatched by MIME type"
 arch=('x86_64')
 license=('MIT')
 depends=('perl-file-mimeinfo')
+optdepends=('bash-completion: bash completion support')
 makedepends=('go')
 source=()
 sha256sums=()
@@ -24,4 +25,11 @@ package() {
     DESTDIR="$pkgdir" "$srcdir/mime-dispatch-install" --vendor \
       "$pkgdir/usr/lib/mime-dispatch/$plugin"
   done
+
+  install -Dm644 "$startdir/../../completions/metadata.bash" \
+    "$pkgdir/usr/share/bash-completion/completions/metadata"
+  install -Dm644 "$startdir/../../completions/open.bash" \
+    "$pkgdir/usr/share/bash-completion/completions/open"
+  install -Dm644 "$startdir/../../completions/mime-dispatch-install.bash" \
+    "$pkgdir/usr/share/bash-completion/completions/mime-dispatch-install"
 }
