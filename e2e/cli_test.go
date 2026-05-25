@@ -1001,7 +1001,7 @@ func TestPluginCapabilitiesAudioMutagen(t *testing.T) {
 		t.Fatalf("failed to parse capabilities: %v", err)
 	}
 
-	expectedMimetypes := []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg", "audio/flac"}
+	expectedMimetypes := []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg", "audio/flac", "audio/mp4"}
 	for _, mt := range expectedMimetypes {
 		found := false
 		for _, got := range caps.Mimetypes {
@@ -1320,7 +1320,7 @@ func TestPluginCapabilitiesAudio(t *testing.T) {
 		t.Fatalf("failed to parse capabilities: %v", err)
 	}
 
-	expectedMimetypes := []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg"}
+	expectedMimetypes := []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg", "audio/flac", "audio/mp4"}
 	for _, mt := range expectedMimetypes {
 		found := false
 		for _, got := range caps.Mimetypes {

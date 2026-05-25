@@ -11,7 +11,7 @@ import (
 
 func main() {
 	caps := plugincli.Capabilities{
-		Mimetypes: []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg", "audio/flac"},
+		Mimetypes: []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg", "audio/flac", "audio/mp4"},
 		Commands: map[string]func() error{
 			"metadata-list": func() error {
 				args := plugincli.ParseArgs("metadata-list", usage)

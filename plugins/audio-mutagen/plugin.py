@@ -19,6 +19,7 @@ MIMETYPES = [
     "audio/ogg",
     "audio/x-vorbis+ogg",
     "audio/flac",
+    "audio/mp4",
 ]
 
 COMMANDS = ["metadata-add", "metadata-delete"]
