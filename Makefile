@@ -52,6 +52,9 @@ test-e2e:
 vet:
 	go vet ./...
 
+package-arch:
+	cd packaging/arch && makepkg -sirCcf --noconfirm
+
 format:
 	gofmt -w .
 	cd plugins/audio && gofmt -w .
