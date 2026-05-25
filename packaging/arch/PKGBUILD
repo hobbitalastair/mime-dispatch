@@ -1,5 +1,5 @@
 pkgname=mime-dispatch
-pkgver=2
+pkgver=3
 pkgrel=1
 pkgdesc="Suite of file-type-independent tools dispatched by MIME type"
 arch=('x86_64')

@@ -60,8 +60,8 @@ func listMetadata(filePath string) error {
 	if composer := metadata.Composer(); composer != "" {
 		result["composer"] = []string{composer}
 	}
-	if genre := metadata.Genre(); genre != "" {
-		result["genre"] = []string{genre}
+	if genres := metadata.Genres(); len(genres) > 0 {
+		result["genre"] = genres
 	}
 	if year := metadata.Year(); year != 0 {
 		result["year"] = []string{fmt.Sprintf("%d", year)}

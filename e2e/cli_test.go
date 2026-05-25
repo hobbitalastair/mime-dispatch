@@ -1216,6 +1216,100 @@ func TestAudioPluginWriteAddGenreOGG(t *testing.T) {
 	}
 }
 
+func TestAudioPluginWriteMultiGenreOGG(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.ogg")
+	err := copyFile("samples/sample1.ogg", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Ambient")
+	if err != nil {
+		t.Fatalf("add first genre: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Electronic")
+	if err != nil {
+		t.Fatalf("add second genre: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	metadata := parseMetadataOutput(t, output)
+	genres, ok := metadata["genre"]
+	if !ok {
+		t.Fatalf("expected genre in output, got: %s", output)
+	}
+
+	foundAmbient := false
+	foundElectronic := false
+	for _, g := range genres {
+		if g == "Ambient" {
+			foundAmbient = true
+		}
+		if g == "Electronic" {
+			foundElectronic = true
+		}
+	}
+	if !foundAmbient {
+		t.Errorf("expected Ambient in genres %v", genres)
+	}
+	if !foundElectronic {
+		t.Errorf("expected Electronic in genres %v", genres)
+	}
+}
+
+func TestAudioPluginWriteMultiGenreMP3(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Ambient")
+	if err != nil {
+		t.Fatalf("add first genre: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Electronic")
+	if err != nil {
+		t.Fatalf("add second genre: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	metadata := parseMetadataOutput(t, output)
+	genres, ok := metadata["genre"]
+	if !ok {
+		t.Fatalf("expected genre in output, got: %s", output)
+	}
+
+	foundAmbient := false
+	foundElectronic := false
+	for _, g := range genres {
+		if g == "Ambient" {
+			foundAmbient = true
+		}
+		if g == "Electronic" {
+			foundElectronic = true
+		}
+	}
+	if !foundAmbient {
+		t.Errorf("expected Ambient in genres %v", genres)
+	}
+	if !foundElectronic {
+		t.Errorf("expected Electronic in genres %v", genres)
+	}
+}
+
 func TestImagePluginListMetadata(t *testing.T) {
 
 	output, err := runCLI(t, "list", "--file-only", "samples/image.jpg")
