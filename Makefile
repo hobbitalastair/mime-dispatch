@@ -9,7 +9,7 @@ GO_BUILD += -ldflags "$(LDFLAGS)"
 endif
 
 BINARIES = metadata open mime-dispatch-install
-PLUGINS = metadata-yaml-frontmatter metadata-audio metadata-image
+PLUGINS = metadata-yaml-frontmatter metadata-audio metadata-image metadata-audio-write
 
 .PHONY: build binaries plugins test test-unit test-e2e vet format clean
 
@@ -37,6 +37,10 @@ $(OUTDIR)/metadata-audio:
 $(OUTDIR)/metadata-image:
 	cd plugins/image && $(GO_BUILD) -o $@ .
 
+$(OUTDIR)/metadata-audio-write:
+	cp plugins/audio-mutagen/plugin.py $@
+	chmod +x $@
+
 test: test-unit test-e2e
 
 test-unit:
@@ -53,6 +57,7 @@ format:
 	cd plugins/audio && gofmt -w .
 	cd plugins/image && gofmt -w .
 	cd plugins/yaml-frontmatter && gofmt -w .
+	black plugins/audio-mutagen/plugin.py
 
 clean:
 	rm -rf $(OUTDIR)

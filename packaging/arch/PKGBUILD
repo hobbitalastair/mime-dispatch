@@ -1,11 +1,11 @@
 pkgname=mime-dispatch
-pkgver=1
+pkgver=2
 pkgrel=1
 pkgdesc="Suite of file-type-independent tools dispatched by MIME type"
 arch=('x86_64')
 license=('MIT')
 depends=('perl-file-mimeinfo')
-optdepends=('bash-completion: bash completion support')
+optdepends=('bash-completion: bash completion support' 'python-mutagen: audio tag writing')
 makedepends=('go')
 source=()
 sha256sums=()
@@ -20,7 +20,7 @@ package() {
   install -Dm755 "$srcdir/mime-dispatch-install" "$pkgdir/usr/bin/mime-dispatch-install"
   install -Dm755 "$srcdir/open" "$pkgdir/usr/bin/open"
 
-  for plugin in metadata-yaml-frontmatter metadata-audio metadata-image; do
+  for plugin in metadata-yaml-frontmatter metadata-audio metadata-image metadata-audio-write; do
     install -Dm755 "$srcdir/$plugin" "$pkgdir/usr/lib/mime-dispatch/$plugin"
     DESTDIR="$pkgdir" "$srcdir/mime-dispatch-install" --vendor \
       "$pkgdir/usr/lib/mime-dispatch/$plugin"

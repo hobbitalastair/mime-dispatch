@@ -13,15 +13,17 @@ A suite of file-type-independent tools dispatched by MIME type. Plugins register
 Included plugins:
 
 - `yaml-frontmatter` -- YAML front matter in Markdown and plain text files (read/write).
-- `audio` -- MP3 (ID3) and OGG (Vorbis) tags (read-only).
+- `audio` -- MP3 (ID3), OGG (Vorbis), and FLAC tags (read-only).
+- `audio-mutagen` -- MP3, OGG, and FLAC tag (write).
 - `image` -- JPEG EXIF data (read-only).
 
 See `spec/plugins.md` for how to write and install plugins.
 
 ## Dependencies
 
-- `perl-file-mimeinfo` (provides the `mimetype` command for MIME type detection)
 - Go 1.25+
+- `perl-file-mimeinfo` (provides the `mimetype` command for MIME type detection)
+- `python` and `python-mutagen` for audio tag writing
 
 ## Building
 

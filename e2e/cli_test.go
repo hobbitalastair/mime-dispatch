@@ -103,6 +103,17 @@ func installPlugins() error {
 			return fmt.Errorf("install %s: %v\n%s", plugin, err, output)
 		}
 	}
+
+	audioMutagenPath, err := filepath.Abs("../plugins/audio-mutagen/plugin.py")
+	if err != nil {
+		return fmt.Errorf("audio-mutagen path: %w", err)
+	}
+	cmd := exec.Command(installer, "--user", audioMutagenPath)
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+testDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("install audio-mutagen: %v\n%s", err, output)
+	}
+
 	return nil
 }
 
@@ -947,52 +958,7 @@ func TestAudioPluginList(t *testing.T) {
 	}
 }
 
-func TestAudioPluginSetFallback(t *testing.T) {
-
-	tmpDir := t.TempDir()
-
-	testFile := filepath.Join(tmpDir, "test.mp3")
-	err := copyFile("samples/sample1.mp3", testFile)
-	if err != nil {
-		t.Fatalf("failed to copy test file: %v", err)
-	}
-
-	output, err := runCLI(t, "add", testFile, "custom-key", "custom-value")
-	if err != nil {
-		t.Fatalf("add failed: %v, output: %s", err, output)
-	}
-
-	listOutput, err := runCLI(t, "list", testFile)
-	if err != nil {
-		t.Fatalf("list failed: %v, output: %s", err, listOutput)
-	}
-
-	if !strings.Contains(listOutput, "custom-key: custom-value") {
-		t.Errorf("expected custom-key in output (xattr fallback), got: %s", listOutput)
-	}
-}
-
-func TestAudioPluginDeleteKeyExistsInFile(t *testing.T) {
-
-	tmpDir := t.TempDir()
-
-	testFile := filepath.Join(tmpDir, "test.mp3")
-	err := copyFile("samples/sample1.mp3", testFile)
-	if err != nil {
-		t.Fatalf("failed to copy test file: %v", err)
-	}
-
-	delOutput, err := runCLI(t, "delete", testFile, "title", "Test Title")
-	if err == nil {
-		t.Error("expected error when deleting key that exists in file")
-	}
-
-	if !strings.Contains(delOutput, "read-only") {
-		t.Errorf("expected error about read-only, got: %v, output: %s", err, delOutput)
-	}
-}
-
-func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
+func TestAudioPluginDeleteUnknownKeyViaXattr(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
@@ -1019,6 +985,234 @@ func TestAudioPluginDeleteKeyNotInFile(t *testing.T) {
 
 	if strings.Contains(output, "custom-key:") {
 		t.Errorf("expected custom-key to be deleted, got: %s", output)
+	}
+}
+
+func TestPluginCapabilitiesAudioMutagen(t *testing.T) {
+	pluginPath := "../plugins/audio-mutagen/plugin.py"
+	cmd := exec.Command(pluginPath, "--capabilities")
+	stdout, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("--capabilities failed: %v", err)
+	}
+
+	caps, err := pluginio.DeserializeCapabilities(string(stdout))
+	if err != nil {
+		t.Fatalf("failed to parse capabilities: %v", err)
+	}
+
+	expectedMimetypes := []string{"audio/mpeg", "audio/ogg", "audio/x-vorbis+ogg", "audio/flac"}
+	for _, mt := range expectedMimetypes {
+		found := false
+		for _, got := range caps.Mimetypes {
+			if got == mt {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected mimetype %q in capabilities, got: %v", mt, caps.Mimetypes)
+		}
+	}
+
+	expectedCommands := []string{"metadata-add", "metadata-delete"}
+	if len(caps.Commands) != len(expectedCommands) {
+		t.Errorf("expected %d commands, got %d: %v", len(expectedCommands), len(caps.Commands), caps.Commands)
+	}
+	for _, cmd := range expectedCommands {
+		found := false
+		for _, got := range caps.Commands {
+			if got == cmd {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected command %q in capabilities, got: %v", cmd, caps.Commands)
+		}
+	}
+}
+
+func TestAudioPluginWriteAddGenre(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Jazz")
+	if err != nil {
+		t.Fatalf("add genre: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if !strings.Contains(output, "Jazz") {
+		t.Errorf("expected Jazz in genre after add, got: %s", output)
+	}
+}
+
+func TestAudioPluginWriteAddMultipleGenres(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Jazz")
+	if err != nil {
+		t.Fatalf("add genre Jazz: %v", err)
+	}
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Blues")
+	if err != nil {
+		t.Fatalf("add genre Blues: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if !strings.Contains(output, "Jazz") {
+		t.Errorf("expected Jazz in genre, got: %s", output)
+	}
+	if !strings.Contains(output, "Blues") {
+		t.Errorf("expected Blues in genre, got: %s", output)
+	}
+}
+
+func TestAudioPluginWriteDeleteGenre(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Jazz")
+	if err != nil {
+		t.Fatalf("add genre: %v", err)
+	}
+
+	_, err = runCLI(t, "delete", "--file-only", testFile, "genre", "Soundtracks")
+	if err != nil {
+		t.Fatalf("delete genre: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if strings.Contains(output, "Soundtracks") {
+		t.Errorf("expected Soundtracks to be removed from genre, got: %s", output)
+	}
+	if !strings.Contains(output, "Jazz") {
+		t.Errorf("expected Jazz to remain in genre, got: %s", output)
+	}
+}
+
+func TestAudioPluginWriteAlbumArtist(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "album_artist", "TestArtist")
+	if err != nil {
+		t.Fatalf("add album_artist: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if !strings.Contains(output, "TestArtist") {
+		t.Errorf("expected TestArtist in album_artist, got: %s", output)
+	}
+}
+
+func TestAudioPluginWriteYear(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	// Delete existing year first so the TDRC frame ends up with a
+	// single value (the Go reader can't parse multi-value TDRC).
+	_, err = runCLI(t, "delete", "--file-only", testFile, "year", "2013")
+	if err != nil {
+		t.Fatalf("delete year: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "year", "2025")
+	if err != nil {
+		t.Fatalf("add year: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if !strings.Contains(output, "2025") {
+		t.Errorf("expected 2025 in year, got: %s", output)
+	}
+}
+
+func TestAudioPluginWriteComment(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.mp3")
+	err := copyFile("samples/sample1.mp3", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "comment", "Test comment")
+	if err != nil {
+		t.Fatalf("add comment: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if !strings.Contains(output, "Test comment") {
+		t.Errorf("expected comment in output, got: %s", output)
+	}
+}
+
+func TestAudioPluginWriteAddGenreOGG(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.ogg")
+	err := copyFile("samples/sample1.ogg", testFile)
+	if err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	_, err = runCLI(t, "add", "--file-only", testFile, "genre", "Ambient")
+	if err != nil {
+		t.Fatalf("add genre: %v", err)
+	}
+
+	output, err := runCLI(t, "list", "--file-only", testFile)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if !strings.Contains(output, "Ambient") {
+		t.Errorf("expected Ambient in genre after add, got: %s", output)
 	}
 }
 
